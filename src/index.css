@@ -1,0 +1,137 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Custom Dune Theme */
+@theme {
+  /* Color palette - Dune inspired colors */
+  --color-dune-sand-50: #FBF7F0;
+  --color-dune-sand-100: #F5E6D3;
+  --color-dune-sand-200: #EDD5B8;
+  --color-dune-sand-300: #E3C29D;
+  --color-dune-sand-400: #D4A574;
+  --color-dune-sand-500: #C9A961;
+  --color-dune-sand-600: #B38D45;
+  --color-dune-sand-700: #8C6E35;
+  --color-dune-sand-800: #6B5429;
+  --color-dune-sand-900: #4A3A1D;
+  
+  --color-dune-spice-50: #FFF4E6;
+  --color-dune-spice-100: #FFE5CC;
+  --color-dune-spice-200: #FFD1A3;
+  --color-dune-spice-300: #FFB870;
+  --color-dune-spice-400: #FF9F4D;
+  --color-dune-spice-500: #FF8C42;
+  --color-dune-spice-600: #E67A35;
+  --color-dune-spice-700: #CC6829;
+  --color-dune-spice-800: #B3581F;
+  --color-dune-spice-900: #8C4517;
+  
+  --color-dune-desert-50: #3D3530;
+  --color-dune-desert-100: #2E2822;
+  --color-dune-desert-200: #221F1A;
+  --color-dune-desert-300: #1A1410;
+  --color-dune-desert-400: #130F0C;
+  --color-dune-desert-500: #0D0A08;
+  
+  --color-dune-fremen-blue: #0077BE;
+  --color-dune-fremen-lightBlue: #4DA6D6;
+  
+  --color-dune-atreides-green: #2D5016;
+  --color-dune-atreides-gold: #D4AF37;
+  
+  /* Font families */
+  --font-dune: Cinzel, serif;
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  
+  /* Shadows - Spice and sand glow effects */
+  --shadow-spice-glow: 0 0 20px rgba(255, 140, 66, 0.5);
+  --shadow-sand-glow: 0 0 15px rgba(201, 169, 97, 0.3);
+  
+  /* Animations */
+  --animate-sand-flow: sandFlow 8s ease-in-out infinite;
+  --animate-spice-pulse: spicePulse 2s ease-in-out infinite;
+  --animate-sandworm-emerge: sandwormEmerge 3s ease-out forwards;
+  --animate-text-shimmer: textShimmer 2s ease-in-out infinite;
+  --animate-fade-in: fadeIn 0.5s ease-in-out;
+  --animate-slide-up: slideUp 0.6s ease-out;
+  
+  /* Animation keyframes */
+  @keyframes sandFlow {
+    0%, 100% { transform: translateX(0) translateY(0); }
+    50% { transform: translateX(20px) translateY(-10px); }
+  }
+  
+  @keyframes spicePulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.05); }
+  }
+  
+  @keyframes sandwormEmerge {
+    0% { transform: translateY(100%); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+  
+  @keyframes textShimmer {
+    0%, 100% { text-shadow: 0 0 10px rgba(201, 169, 97, 0.8); }
+    50% { text-shadow: 0 0 20px rgba(255, 140, 66, 1); }
+  }
+  
+  @keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  
+  @keyframes slideUp {
+    0% { transform: translateY(20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+}
+
+/* Base styles */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  body {
+    background: linear-gradient(135deg, #1A1410 0%, #2E2822 100%);
+    background-color: var(--color-dune-desert-300);
+    color: var(--color-dune-sand-100);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-dune);
+  }
+}
+
+/* Custom utilities */
+@layer utilities {
+  .text-glow {
+    text-shadow: 0 0 10px rgba(201, 169, 97, 0.8);
+  }
+  
+  .text-glow-strong {
+    text-shadow: 0 0 20px rgba(255, 140, 66, 1);
+  }
+  
+  .sand-particles {
+    background-image: 
+      radial-gradient(2px 2px at 20px 30px, rgba(201, 169, 97, 0.3), transparent),
+      radial-gradient(2px 2px at 60px 70px, rgba(201, 169, 97, 0.3), transparent),
+      radial-gradient(1px 1px at 50px 50px, rgba(201, 169, 97, 0.2), transparent),
+      radial-gradient(1px 1px at 130px 80px, rgba(201, 169, 97, 0.2), transparent),
+      radial-gradient(2px 2px at 90px 10px, rgba(201, 169, 97, 0.3), transparent);
+    background-size: 200px 200px;
+    animation: sandFlow 8s ease-in-out infinite;
+  }
+  
+  .bg-dune-gradient {
+    background: linear-gradient(135deg, #1A1410 0%, #2E2822 100%);
+  }
+}
