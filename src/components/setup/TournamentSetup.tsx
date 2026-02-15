@@ -76,8 +76,9 @@ export function TournamentSetup() {
   const isValidCount = players.length >= 8 && players.length % 4 === 0;
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sand-particles">
-      <Card variant="elevated" className="w-full max-w-3xl">
+    <div className="min-h-screen flex items-center justify-center p-4 relative">
+      <div className="fixed inset-0 sand-particles opacity-30" />
+      <Card variant="elevated" className="w-full max-w-3xl relative z-10">
         <div className="text-center mb-8">
           <h2 className="text-4xl font-dune text-dune-spice-500 text-glow-strong mb-2">
             Tournament Setup
