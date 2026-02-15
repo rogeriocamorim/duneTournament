@@ -11,7 +11,7 @@ import { FinalResults } from './components/standings/FinalResults';
 function App() {
   return (
     <TournamentProvider>
-      <BrowserRouter basename="/tournament">
+      <BrowserRouter basename="/duneTournament">
         <div className="min-h-screen bg-dune-gradient">
           <Header />
           <Routes>
