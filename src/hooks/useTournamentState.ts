@@ -10,6 +10,7 @@ import {
   generateGrandFinal,
   applyResults,
   getStandings,
+  getFinalStandings,
 } from "../engine/tournament";
 
 const STORAGE_KEY = "dune_tournament_state";
@@ -265,7 +266,9 @@ export function useTournamentState() {
     dispatch({ type: "RESET" });
   }, []);
 
-  const standings = getStandings(state.players);
+  const standings = state.phase === "finished"
+    ? getFinalStandings(state)
+    : getStandings(state.players);
 
   // Export as JSON
   const exportState = useCallback(() => {

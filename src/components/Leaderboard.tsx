@@ -5,10 +5,12 @@ import { getStandings } from "../engine/tournament";
 interface LeaderboardProps {
   players: Player[];
   highlightTop?: number;
+  /** Pre-sorted standings to use instead of default getStandings() */
+  finalStandings?: Player[];
 }
 
-export function Leaderboard({ players, highlightTop = 0 }: LeaderboardProps) {
-  const standings = getStandings(players);
+export function Leaderboard({ players, highlightTop = 0, finalStandings }: LeaderboardProps) {
+  const standings = finalStandings ?? getStandings(players);
 
   return (
     <div className="space-y-2">

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { TableCard } from "../components/TableCard";
 import { Leaderboard } from "../components/Leaderboard";
 import type { TournamentState, TableResult } from "../engine/types";
-import { getTop8 } from "../engine/tournament";
+import { getTop8, getFinalStandings } from "../engine/tournament";
 import { Trophy, Crown, Swords, ChevronRight, BarChart3 } from "lucide-react";
 
 interface Top8PageProps {
@@ -42,6 +42,9 @@ export function Top8Page({
     (currentRound.type === "semifinal" || currentRound.type === "winners-final");
 
   const isFinished = state.phase === "finished";
+
+  // Compute final standings that respect Grand Final placement
+  const finalStandings = isFinished ? getFinalStandings(state) : undefined;
 
   // Find the grand final winner
   const grandFinal = state.rounds.find((r) => r.type === "grand-final");
@@ -222,7 +225,7 @@ export function Top8Page({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
             >
-              <Leaderboard players={state.players} highlightTop={8} />
+              <Leaderboard players={state.players} highlightTop={8} finalStandings={finalStandings} />
             </motion.div>
           )}
         </div>

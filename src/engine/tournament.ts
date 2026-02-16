@@ -261,6 +261,62 @@ export function getTop8(state: TournamentState): Player[] {
   return getStandings(state.players).slice(0, 8);
 }
 
+/**
+ * Final standings that respect Grand Final placement.
+ * Once the Grand Final is complete:
+ *   - Positions 1-4: Grand Final placement order (1st = champion)
+ *   - Positions 5-8: Top 8 players who didn't reach Grand Final, sorted by cumulative stats
+ *   - Positions 9+: Everyone else by cumulative stats
+ * If Grand Final is not complete, falls back to cumulative standings.
+ */
+export function getFinalStandings(state: TournamentState): Player[] {
+  const grandFinal = state.rounds.find((r) => r.type === "grand-final");
+
+  // If no completed grand final, just use normal standings
+  if (!grandFinal?.isComplete) {
+    return getStandings(state.players);
+  }
+
+  const grandFinalResults = [...grandFinal.tables[0].results].sort(
+    (a, b) => a.position - b.position
+  );
+  const grandFinalPlayerIds = new Set(grandFinalResults.map((r) => r.playerId));
+
+  // Find all Top 8 player IDs (players who participated in any top8 round)
+  const top8PlayerIds = new Set<string>();
+  for (const round of state.rounds) {
+    if (
+      round.type === "semifinal" ||
+      round.type === "winners-final" ||
+      round.type === "losers-final" ||
+      round.type === "grand-final"
+    ) {
+      for (const table of round.tables) {
+        for (const pid of table.playerIds) {
+          top8PlayerIds.add(pid);
+        }
+      }
+    }
+  }
+
+  // Tier 1: Grand Final players in their Grand Final finishing order
+  const tier1 = grandFinalResults
+    .map((r) => state.players.find((p) => p.id === r.playerId))
+    .filter(Boolean) as Player[];
+
+  // Tier 2: Top 8 players NOT in Grand Final, sorted by cumulative stats
+  const tier2Players = state.players.filter(
+    (p) => top8PlayerIds.has(p.id) && !grandFinalPlayerIds.has(p.id)
+  );
+  const tier2 = getStandings(tier2Players);
+
+  // Tier 3: Everyone else, sorted by cumulative stats
+  const tier3Players = state.players.filter((p) => !top8PlayerIds.has(p.id));
+  const tier3 = getStandings(tier3Players);
+
+  return [...tier1, ...tier2, ...tier3];
+}
+
 // ===== LEADER STATISTICS =====
 
 /**
