@@ -9,6 +9,8 @@ import {
   generateFinalsRound6,
   generateGrandFinal,
   applyResults,
+  revertTableResults,
+  applyTableResults,
   getStandings,
   getFinalStandings,
 } from "../engine/tournament";
@@ -82,12 +84,32 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
     }
 
     case "SUBMIT_TABLE_RESULTS": {
-      const newState = structuredClone(state);
+      let newState = structuredClone(state);
       const round = newState.rounds[action.roundIndex];
       if (!round) return state;
 
       const table = round.tables.find((t) => t.id === action.tableId);
       if (!table) return state;
+
+      // If this table was previously complete and scored, revert old scoring first
+      const wasRoundComplete = round.isComplete;
+      if (table.isComplete && table.results.length > 0 && wasRoundComplete) {
+        newState = revertTableResults(newState, action.roundIndex, action.tableId);
+        // Re-read table reference after revert (structuredClone in revert)
+        const revertedRound = newState.rounds[action.roundIndex];
+        const revertedTable = revertedRound.tables.find((t) => t.id === action.tableId);
+        if (revertedTable) {
+          revertedTable.results = action.results;
+          revertedTable.isComplete = true;
+        }
+        // Re-check round completeness
+        revertedRound.isComplete = revertedRound.tables.every((t) => t.isComplete);
+        // Apply new scoring for this table
+        if (revertedRound.isComplete) {
+          newState = applyTableResults(newState, action.roundIndex, action.tableId);
+        }
+        return newState;
+      }
 
       table.results = action.results;
       table.isComplete = true;
@@ -95,7 +117,7 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
       // Check if all tables in round are complete
       round.isComplete = round.tables.every((t) => t.isComplete);
 
-      // If round is complete, apply results
+      // If round is complete, apply results for ALL tables
       if (round.isComplete) {
         return applyResults(newState, action.roundIndex);
       }

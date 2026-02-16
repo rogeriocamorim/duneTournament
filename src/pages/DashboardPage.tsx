@@ -173,7 +173,7 @@ export function DashboardPage({
           )}
 
           {/* Table Grid */}
-          {currentRound && !currentRound.isComplete && (
+          {currentRound && (
             <div>
               <h2 className="text-display text-sm text-sand-dark mb-4 text-center">
                 Round {currentRound.number} &mdash;{" "}
@@ -196,6 +196,7 @@ export function DashboardPage({
                     roundIndex={state.rounds.length - 1}
                     onSubmitResults={onSubmitResults}
                     animationDelay={index}
+                    allowEdit={currentRound.isComplete}
                   />
                 ))}
               </div>
@@ -203,14 +204,14 @@ export function DashboardPage({
           )}
 
           {/* Completed round summary */}
-          {currentRound?.isComplete && (
+          {currentRound?.isComplete && !qualifyingDone && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="text-center mt-4"
             >
-              <p className="text-sm text-spice uppercase tracking-widest">
-                Round {currentRound.number} Complete
+              <p className="text-sm text-sand-dark uppercase tracking-widest">
+                Round {currentRound.number} Complete &mdash; Review results above or generate the next round
               </p>
             </motion.div>
           )}

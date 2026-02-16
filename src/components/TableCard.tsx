@@ -2,6 +2,7 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import type { Table, TableResult, Player } from "../engine/types";
 import { LEADER_LIST } from "../engine/types";
+import { Pencil } from "lucide-react";
 
 interface TableCardProps {
   table: Table;
@@ -9,6 +10,7 @@ interface TableCardProps {
   roundIndex: number;
   onSubmitResults: (roundIndex: number, tableId: number, results: TableResult[]) => void;
   animationDelay?: number;
+  allowEdit?: boolean;
 }
 
 const tableVariants = {
@@ -32,6 +34,7 @@ export function TableCard({
   roundIndex,
   onSubmitResults,
   animationDelay = 0,
+  allowEdit = false,
 }: TableCardProps) {
   const [editing, setEditing] = useState(!table.isComplete);
   const [results, setResults] = useState<Record<string, { position: number; vp: number; leader: string }>>(
@@ -121,10 +124,21 @@ export function TableCard({
             <span className="text-xs text-blood opacity-70 ml-1">DESCENT</span>
           )}
         </h3>
-        {table.isComplete && (
-          <span className="text-xs uppercase tracking-widest text-spice opacity-60">
-            Complete
-          </span>
+        {table.isComplete && !editing && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-widest text-spice opacity-60">
+              Complete
+            </span>
+            {allowEdit && (
+              <button
+                onClick={() => setEditing(true)}
+                className="text-sand-dark hover:text-spice transition-colors p-1"
+                title="Edit results"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+          </div>
         )}
       </div>
 

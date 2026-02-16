@@ -148,7 +148,7 @@ export function Top8Page({
       )}
 
       {/* Current Round Tables */}
-      {currentRound && !currentRound.isComplete && (
+      {currentRound && (
         <div className="mb-8">
           <h2 className="text-display text-sm text-center text-sand-dark mb-4">
             {currentRound.type === "semifinal" && "Round 5 — Semifinals"}
@@ -169,6 +169,7 @@ export function Top8Page({
                   roundIndex={state.rounds.length - 1}
                   onSubmitResults={onSubmitResults}
                   animationDelay={index}
+                  allowEdit={currentRound.isComplete}
                 />
               </div>
             ))}

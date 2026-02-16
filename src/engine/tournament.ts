@@ -247,6 +247,60 @@ export function applyResults(state: TournamentState, roundIndex: number): Tourna
   return newState;
 }
 
+/**
+ * Revert scoring for a single table that was previously completed.
+ * Used when editing results on a table that has already been scored.
+ */
+export function revertTableResults(state: TournamentState, roundIndex: number, tableId: number): TournamentState {
+  const newState = structuredClone(state);
+  const round = newState.rounds[roundIndex];
+  if (!round) return newState;
+
+  const table = round.tables.find((t) => t.id === tableId);
+  if (!table || !table.isComplete || table.results.length === 0) return newState;
+
+  for (const result of table.results) {
+    const player = newState.players.find((p) => p.id === result.playerId);
+    if (!player) continue;
+
+    player.points -= POINTS[result.position] || 0;
+    player.totalVP -= result.vp;
+    player.efficiency -= result.position;
+  }
+
+  return newState;
+}
+
+/**
+ * Apply scoring for a single table.
+ */
+export function applyTableResults(state: TournamentState, roundIndex: number, tableId: number): TournamentState {
+  const newState = structuredClone(state);
+  const round = newState.rounds[roundIndex];
+  if (!round) return newState;
+
+  const table = round.tables.find((t) => t.id === tableId);
+  if (!table || !table.isComplete || table.results.length === 0) return newState;
+
+  for (const result of table.results) {
+    const player = newState.players.find((p) => p.id === result.playerId);
+    if (!player) continue;
+
+    player.points += POINTS[result.position] || 0;
+    player.totalVP += result.vp;
+    player.efficiency += result.position;
+
+    // Track opponents
+    for (const otherId of table.playerIds) {
+      if (otherId !== result.playerId && !player.opponents.includes(otherId)) {
+        player.opponents.push(otherId);
+      }
+    }
+  }
+
+  return newState;
+}
+
 // ===== RANKINGS =====
 
 export function getStandings(players: Player[]): Player[] {
