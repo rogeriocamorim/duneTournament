@@ -33,7 +33,11 @@ body {
   margin: 0;
   padding: 0;
   font-family: var(--font-display);
-  background: linear-gradient(135deg, var(--color-obsidian) 0%, var(--color-obsidian-light) 100%);
+  background-image: url("./assets/background.png");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   color: var(--color-sand);
   min-height: 100vh;
   overflow-x: hidden;
