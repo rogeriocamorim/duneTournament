@@ -82,7 +82,7 @@ function App() {
               <img src={iconImage} alt="Dune Imperium" className="w-full h-full rounded-full object-cover" />
             </div>
             <span className="text-display text-xs tracking-[0.3em] text-spice hidden sm:inline">
-              Tournament Oracle
+              Imperium Arbiter
             </span>
           </div>
 
