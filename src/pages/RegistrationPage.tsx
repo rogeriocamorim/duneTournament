@@ -34,7 +34,7 @@ export function RegistrationPage({
           The Summoning
         </h1>
         <p className="text-sm text-sand-dark uppercase tracking-[0.3em]">
-          Gather the Houses of the Landsraad
+          Champions Rise to Claim Glory
         </p>
       </motion.div>
 
