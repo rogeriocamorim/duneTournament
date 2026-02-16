@@ -11,6 +11,7 @@ import {
   Database,
   Sparkles,
 } from "lucide-react";
+import iconImage from "./assets/icon.png";
 
 function App() {
   const {
@@ -78,7 +79,7 @@ function App() {
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-spice/20 flex items-center justify-center">
-              <span className="text-spice text-xs font-bold">DI</span>
+              <img src={iconImage} alt="Dune Imperium" className="w-full h-full rounded-full object-cover" />
             </div>
             <span className="text-display text-xs tracking-[0.3em] text-spice hidden sm:inline">
               Tournament Oracle
