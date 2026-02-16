@@ -5,19 +5,15 @@ import type { Player } from "../engine/types";
 
 interface RegistrationPageProps {
   players: Player[];
-  tournamentName: string;
   onAddPlayer: (name: string) => void;
   onRemovePlayer: (id: string) => void;
-  onSetName: (name: string) => void;
   onStart: () => void;
 }
 
 export function RegistrationPage({
   players,
-  tournamentName,
   onAddPlayer,
   onRemovePlayer,
-  onSetName,
   onStart,
 }: RegistrationPageProps) {
   const canStart = players.length >= 4;
@@ -36,24 +32,6 @@ export function RegistrationPage({
         <p className="text-sm text-sand-dark uppercase tracking-[0.3em]">
           Champions Rise to Claim Glory
         </p>
-      </motion.div>
-
-      {/* Tournament Name */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="mb-8"
-      >
-        <label className="block text-xs text-sand-dark uppercase tracking-[0.2em] mb-2 opacity-60">
-          Tournament Name
-        </label>
-        <input
-          value={tournamentName}
-          onChange={(e) => onSetName(e.target.value)}
-          className="input-imperial text-xl"
-          placeholder="Dune Bloodlines Open"
-        />
       </motion.div>
 
       {/* Sandworm Registration */}
