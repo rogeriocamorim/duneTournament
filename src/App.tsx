@@ -11,14 +11,13 @@ import {
   Database,
   Sparkles,
 } from "lucide-react";
-import iconImage from "./assets/icon.png";
+
 
 function App() {
   const {
     state,
     addPlayer,
     removePlayer,
-    setTournamentName,
     startTournament,
     generateRound,
     submitTableResults,
@@ -74,18 +73,9 @@ function App() {
       <motion.nav
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="sticky top-0 z-30 glass-morphism-strong"
+        className="sticky top-0 z-30"
       >
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-spice/20 flex items-center justify-center">
-              <img src={iconImage} alt="Dune Imperium" className="w-full h-full rounded-full object-cover" />
-            </div>
-            <span className="text-display text-xs tracking-[0.3em] text-spice hidden sm:inline">
-              Imperium Arbiter
-            </span>
-          </div>
-
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-end">
           <div className="flex items-center gap-2">
             <button
               onClick={toggleDramaticReveal}
@@ -127,10 +117,8 @@ function App() {
           >
             <RegistrationPage
               players={state.players}
-              tournamentName={state.metadata.tournamentName}
               onAddPlayer={addPlayer}
               onRemovePlayer={removePlayer}
-              onSetName={setTournamentName}
               onStart={handleStart}
             />
           </motion.div>
