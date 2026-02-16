@@ -4,13 +4,12 @@ import { TableCard } from "../components/TableCard";
 import { Leaderboard } from "../components/Leaderboard";
 import { LeaderStatsPanel } from "../components/LeaderStatsPanel";
 import type { TournamentState, TableResult } from "../engine/types";
-import { Trophy, Swords, ChevronRight, BarChart3, Crown } from "lucide-react";
+import { Trophy, Swords, BarChart3, Crown } from "lucide-react";
 
 interface DashboardPageProps {
   state: TournamentState;
   onGenerateRound: () => void;
   onSubmitResults: (roundIndex: number, tableId: number, results: TableResult[]) => void;
-  onAdvanceRound: () => void;
   onStartTop8: () => void;
 }
 
@@ -20,7 +19,6 @@ export function DashboardPage({
   state,
   onGenerateRound,
   onSubmitResults,
-  onAdvanceRound,
   onStartTop8,
 }: DashboardPageProps) {
   const [activeTab, setActiveTab] = useState<TabView>("tables");
@@ -32,9 +30,6 @@ export function DashboardPage({
     (r) => r.type === "qualifying" && r.isComplete
   ).length;
   const needsNewRound = !currentRound || currentRound.isComplete;
-  const canAdvance =
-    currentRound?.isComplete &&
-    completedQualifying < state.settings.totalQualifyingRounds;
   const qualifyingDone =
     completedQualifying >= state.settings.totalQualifyingRounds;
 
@@ -149,24 +144,6 @@ export function DashboardPage({
                   <Swords size={20} />
                   Generate Round {state.rounds.length + 1}
                 </span>
-              </button>
-            </motion.div>
-          )}
-
-          {canAdvance && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center mb-8"
-            >
-              <button
-                onClick={() => {
-                  onAdvanceRound();
-                }}
-                className="btn-imperial-filled py-3 px-8 flex items-center gap-2 mx-auto"
-              >
-                <ChevronRight size={18} />
-                Advance to Next Round
               </button>
             </motion.div>
           )}

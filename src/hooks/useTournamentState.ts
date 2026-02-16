@@ -24,7 +24,6 @@ type Action =
   | { type: "START_TOURNAMENT" }
   | { type: "GENERATE_ROUND" }
   | { type: "SUBMIT_TABLE_RESULTS"; roundIndex: number; tableId: number; results: TableResult[] }
-  | { type: "ADVANCE_ROUND" }
   | { type: "START_TOP8" }
   | { type: "GENERATE_TOP8_ROUND" }
   | { type: "IMPORT_STATE"; state: TournamentState }
@@ -102,18 +101,6 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
       }
 
       return newState;
-    }
-
-    case "ADVANCE_ROUND": {
-      // Check if we've finished qualifying
-      const completedQualifying = state.rounds.filter(
-        (r) => r.type === "qualifying" && r.isComplete
-      ).length;
-
-      if (completedQualifying >= state.settings.totalQualifyingRounds) {
-        return { ...state, phase: "top8" };
-      }
-      return state;
     }
 
     case "START_TOP8": {
@@ -246,10 +233,6 @@ export function useTournamentState() {
     []
   );
 
-  const advanceRound = useCallback(() => {
-    dispatch({ type: "ADVANCE_ROUND" });
-  }, []);
-
   const startTop8 = useCallback(() => {
     dispatch({ type: "START_TOP8" });
   }, []);
@@ -292,7 +275,6 @@ export function useTournamentState() {
     startTournament,
     generateRound,
     submitTableResults,
-    advanceRound,
     startTop8,
     generateTop8Round,
     importState,

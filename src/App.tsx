@@ -20,7 +20,6 @@ function App() {
     startTournament,
     generateRound,
     submitTableResults,
-    advanceRound,
     startTop8,
     generateTop8Round,
     importState,
@@ -134,7 +133,6 @@ function App() {
               state={state}
               onGenerateRound={generateRound}
               onSubmitResults={submitTableResults}
-              onAdvanceRound={advanceRound}
               onStartTop8={handleStartTop8}
             />
           </motion.div>
