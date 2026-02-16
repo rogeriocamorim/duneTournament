@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import { X, Users } from "lucide-react";
 import { SandwormRegistration } from "../components/animations/SandwormRegistration";
 import type { Player } from "../engine/types";
@@ -80,43 +80,34 @@ export function RegistrationPage({
         </span>
       </motion.div>
 
-      {/* Player List */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.6 }}
-        className="space-y-2 mb-8"
-      >
-        <AnimatePresence>
-          {players.map((player, index) => (
-            <motion.div
-              key={player.id}
-              initial={{ opacity: 0, x: -30, scale: 0.9 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: 30, scale: 0.9 }}
-              transition={{
-                type: "spring",
-                stiffness: 300,
-                damping: 25,
-              }}
-              className="glass-morphism rounded-sm px-4 py-3 flex items-center gap-3"
-            >
-              <span className="text-score text-sm fremen-glow w-8">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <span className="text-display text-sm flex-1 truncate">
-                {player.name}
-              </span>
-              <button
-                onClick={() => onRemovePlayer(player.id)}
-                className="text-sand-dark hover:text-blood transition-colors p-1"
+      {/* Player List — compact grid */}
+      {players.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="mb-8 glass-morphism rounded-sm p-4"
+        >
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1">
+            {players.map((player) => (
+              <div
+                key={player.id}
+                className="flex items-center justify-between gap-1 py-1 border-b border-sand-dark/10 last:border-b-0"
               >
-                <X size={14} />
-              </button>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </motion.div>
+                <span className="text-display text-sm truncate">
+                  {player.name}
+                </span>
+                <button
+                  onClick={() => onRemovePlayer(player.id)}
+                  className="text-sand-dark hover:text-blood transition-colors p-0.5 shrink-0"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {/* Start Button */}
       {canStart && (

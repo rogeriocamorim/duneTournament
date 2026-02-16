@@ -134,27 +134,48 @@ function shuffleArray<T>(arr: T[]): void {
   }
 }
 
-// ===== TOP 8 FINALS =====
+// ===== TOP 16 FINALS (Double-Elimination Bracket) =====
 
 /**
- * Generate semifinal tables for Round 5:
- * Table A: seeds 1, 4, 5, 8
- * Table B: seeds 2, 3, 6, 7
+ * Get top 16 players by standings.
+ */
+export function getTopCut(state: TournamentState): Player[] {
+  return getStandings(state.players).slice(0, state.settings.topCut);
+}
+
+/**
+ * Generate semifinal tables for Round 5 (16 players → 4 tables of 4):
+ * Table A: seeds 1, 8, 9, 16
+ * Table B: seeds 2, 7, 10, 15
+ * Table C: seeds 3, 6, 11, 14
+ * Table D: seeds 4, 5, 12, 13
  */
 export function generateSemifinals(state: TournamentState): Table[] {
-  const top8 = getTop8(state);
-  if (top8.length < 8) return [];
+  const top16 = getTopCut(state);
+  if (top16.length < 16) return [];
 
   return [
     {
       id: 1,
-      playerIds: [top8[0].id, top8[3].id, top8[4].id, top8[7].id],
+      playerIds: [top16[0].id, top16[7].id, top16[8].id, top16[15].id],
       results: [],
       isComplete: false,
     },
     {
       id: 2,
-      playerIds: [top8[1].id, top8[2].id, top8[5].id, top8[6].id],
+      playerIds: [top16[1].id, top16[6].id, top16[9].id, top16[14].id],
+      results: [],
+      isComplete: false,
+    },
+    {
+      id: 3,
+      playerIds: [top16[2].id, top16[5].id, top16[10].id, top16[13].id],
+      results: [],
+      isComplete: false,
+    },
+    {
+      id: 4,
+      playerIds: [top16[3].id, top16[4].id, top16[11].id, top16[12].id],
       results: [],
       isComplete: false,
     },
@@ -162,13 +183,14 @@ export function generateSemifinals(state: TournamentState): Table[] {
 }
 
 /**
- * Generate Winners Final & Losers Final from semifinal results.
- * Winners Final: Top 2 from Table A + Top 2 from Table B
- * Losers Final: Bottom 2 from Table A + Bottom 2 from Table B
+ * Generate Round 6 tables from semifinal results (16 players → 4 tables of 4):
+ * Winners Table 1: Top 2 from Table A + Top 2 from Table B
+ * Winners Table 2: Top 2 from Table C + Top 2 from Table D
+ * Losers Table 1:  Bottom 2 from Table A + Bottom 2 from Table B
+ * Losers Table 2:  Bottom 2 from Table C + Bottom 2 from Table D
  */
-export function generateFinalsRound6(semiRound: Round): { winners: Table; losers: Table } {
-  const tableA = semiRound.tables[0];
-  const tableB = semiRound.tables[1];
+export function generateFinalsRound6(semiRound: Round): Table[] {
+  const [tableA, tableB, tableC, tableD] = semiRound.tables;
 
   const sortByResult = (table: Table) => {
     return [...table.results].sort((a, b) => a.position - b.position);
@@ -176,41 +198,59 @@ export function generateFinalsRound6(semiRound: Round): { winners: Table; losers
 
   const sortedA = sortByResult(tableA);
   const sortedB = sortByResult(tableB);
+  const sortedC = sortByResult(tableC);
+  const sortedD = sortByResult(tableD);
 
-  return {
-    winners: {
+  return [
+    // Winners Table 1: top 2 from A + top 2 from B
+    {
       id: 1,
       playerIds: [sortedA[0].playerId, sortedA[1].playerId, sortedB[0].playerId, sortedB[1].playerId],
       results: [],
       isComplete: false,
     },
-    losers: {
+    // Winners Table 2: top 2 from C + top 2 from D
+    {
       id: 2,
-      playerIds: [sortedA[2].playerId, sortedA[3]?.playerId, sortedB[2].playerId, sortedB[3]?.playerId].filter(Boolean),
+      playerIds: [sortedC[0].playerId, sortedC[1].playerId, sortedD[0].playerId, sortedD[1].playerId],
       results: [],
       isComplete: false,
     },
-  };
+    // Losers Table 1: bottom 2 from A + bottom 2 from B
+    {
+      id: 3,
+      playerIds: [sortedA[2].playerId, sortedA[3].playerId, sortedB[2].playerId, sortedB[3].playerId],
+      results: [],
+      isComplete: false,
+    },
+    // Losers Table 2: bottom 2 from C + bottom 2 from D
+    {
+      id: 4,
+      playerIds: [sortedC[2].playerId, sortedC[3].playerId, sortedD[2].playerId, sortedD[3].playerId],
+      results: [],
+      isComplete: false,
+    },
+  ];
 }
 
 /**
- * Generate Grand Final from Winners Final and Losers Final results.
- * Top 2 from Winners Final + Top 2 from Losers Final
+ * Generate Grand Final from the two Winners tables (Round 6).
+ * Top 2 from Winners Table 1 + Top 2 from Winners Table 2 → 1 table of 4.
  */
-export function generateGrandFinal(winnersTable: Table, losersTable: Table): Table {
-  const winnersTop2 = [...winnersTable.results]
+export function generateGrandFinal(winnersTable1: Table, winnersTable2: Table): Table {
+  const winners1Top2 = [...winnersTable1.results]
     .sort((a, b) => a.position - b.position)
     .slice(0, 2)
     .map((r) => r.playerId);
 
-  const losersTop2 = [...losersTable.results]
+  const winners2Top2 = [...winnersTable2.results]
     .sort((a, b) => a.position - b.position)
     .slice(0, 2)
     .map((r) => r.playerId);
 
   return {
     id: 1,
-    playerIds: [...winnersTop2, ...losersTop2],
+    playerIds: [...winners1Top2, ...winners2Top2],
     results: [],
     isComplete: false,
   };
@@ -312,15 +352,15 @@ export function getStandings(players: Player[]): Player[] {
 }
 
 export function getTop8(state: TournamentState): Player[] {
-  return getStandings(state.players).slice(0, 8);
+  return getStandings(state.players).slice(0, state.settings.topCut);
 }
 
 /**
  * Final standings that respect Grand Final placement.
  * Once the Grand Final is complete:
  *   - Positions 1-4: Grand Final placement order (1st = champion)
- *   - Positions 5-8: Top 8 players who didn't reach Grand Final, sorted by cumulative stats
- *   - Positions 9+: Everyone else by cumulative stats
+ *   - Positions 5-16: Top 16 players who didn't reach Grand Final, sorted by cumulative stats
+ *   - Positions 17+: Everyone else by cumulative stats
  * If Grand Final is not complete, falls back to cumulative standings.
  */
 export function getFinalStandings(state: TournamentState): Player[] {
@@ -336,8 +376,8 @@ export function getFinalStandings(state: TournamentState): Player[] {
   );
   const grandFinalPlayerIds = new Set(grandFinalResults.map((r) => r.playerId));
 
-  // Find all Top 8 player IDs (players who participated in any top8 round)
-  const top8PlayerIds = new Set<string>();
+  // Find all Top 16 player IDs (players who participated in any elimination round)
+  const topCutPlayerIds = new Set<string>();
   for (const round of state.rounds) {
     if (
       round.type === "semifinal" ||
@@ -347,7 +387,7 @@ export function getFinalStandings(state: TournamentState): Player[] {
     ) {
       for (const table of round.tables) {
         for (const pid of table.playerIds) {
-          top8PlayerIds.add(pid);
+          topCutPlayerIds.add(pid);
         }
       }
     }
@@ -358,14 +398,14 @@ export function getFinalStandings(state: TournamentState): Player[] {
     .map((r) => state.players.find((p) => p.id === r.playerId))
     .filter(Boolean) as Player[];
 
-  // Tier 2: Top 8 players NOT in Grand Final, sorted by cumulative stats
+  // Tier 2: Top 16 players NOT in Grand Final, sorted by cumulative stats
   const tier2Players = state.players.filter(
-    (p) => top8PlayerIds.has(p.id) && !grandFinalPlayerIds.has(p.id)
+    (p) => topCutPlayerIds.has(p.id) && !grandFinalPlayerIds.has(p.id)
   );
   const tier2 = getStandings(tier2Players);
 
   // Tier 3: Everyone else, sorted by cumulative stats
-  const tier3Players = state.players.filter((p) => !top8PlayerIds.has(p.id));
+  const tier3Players = state.players.filter((p) => !topCutPlayerIds.has(p.id));
   const tier3 = getStandings(tier3Players);
 
   return [...tier1, ...tier2, ...tier3];

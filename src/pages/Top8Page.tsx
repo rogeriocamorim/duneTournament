@@ -6,6 +6,9 @@ import type { TournamentState, TableResult } from "../engine/types";
 import { getTop8, getFinalStandings } from "../engine/tournament";
 import { Trophy, Crown, Swords, ChevronRight, BarChart3 } from "lucide-react";
 
+const SEMI_TABLE_LABELS = ["Table A", "Table B", "Table C", "Table D"];
+const ROUND6_TABLE_LABELS = ["Winners 1", "Winners 2", "Losers 1", "Losers 2"];
+
 interface Top8PageProps {
   state: TournamentState;
   onSubmitResults: (roundIndex: number, tableId: number, results: TableResult[]) => void;
@@ -30,7 +33,12 @@ export function Top8Page({
       r.type === "grand-final"
   );
 
-  const currentRound = state.rounds[state.rounds.length - 1];
+  // Determine which round is the "current" displayed round in this page
+  // Show the latest elimination round, or the last qualifying round if none yet
+  const lastElimRound = [...state.rounds].reverse().find(
+    (r) => r.type === "semifinal" || r.type === "winners-final" || r.type === "losers-final" || r.type === "grand-final"
+  );
+  const currentRound = lastElimRound ?? state.rounds[state.rounds.length - 1];
   const needsGeneration =
     state.phase === "top8" &&
     (!currentRound ||
@@ -107,7 +115,7 @@ export function Top8Page({
         </motion.div>
       )}
 
-      {/* Top 8 Seedings */}
+      {/* Top 16 Seedings */}
       {!isFinished && top8Rounds.length === 0 && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -116,9 +124,9 @@ export function Top8Page({
           className="mb-8"
         >
           <h2 className="text-display text-sm text-center text-sand-dark mb-4">
-            Top 8 Seedings
+            Top 16 Seedings
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-lg mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl mx-auto">
             {top8.map((player, i) => (
               <motion.div
                 key={player.id}
@@ -148,25 +156,30 @@ export function Top8Page({
       )}
 
       {/* Current Round Tables */}
-      {currentRound && (
+      {currentRound && (currentRound.type === "semifinal" || currentRound.type === "winners-final" || currentRound.type === "losers-final" || currentRound.type === "grand-final") && (
         <div className="mb-8">
           <h2 className="text-display text-sm text-center text-sand-dark mb-4">
             {currentRound.type === "semifinal" && "Round 5 — Semifinals"}
-            {currentRound.type === "winners-final" && "Round 6 — Winners & Losers Finals"}
+            {currentRound.type === "winners-final" && "Round 6 — Winners & Losers"}
             {currentRound.type === "grand-final" && "Round 7 — Grand Final"}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {currentRound.tables.map((table, index) => (
-              <div key={table.id}>
-                {currentRound.type === "winners-final" && (
+              <div key={`r${currentRound.number}-t${table.id}`}>
+                {currentRound.type === "semifinal" && (
                   <p className="text-xs text-center text-spice uppercase tracking-widest mb-2">
-                    {index === 0 ? "Winners Final" : "Losers Final"}
+                    {SEMI_TABLE_LABELS[index] ?? `Table ${index + 1}`}
+                  </p>
+                )}
+                {currentRound.type === "winners-final" && (
+                  <p className={`text-xs text-center uppercase tracking-widest mb-2 ${index < 2 ? "text-spice" : "text-sand-dark"}`}>
+                    {ROUND6_TABLE_LABELS[index] ?? `Table ${index + 1}`}
                   </p>
                 )}
                 <TableCard
                   table={table}
                   players={state.players}
-                  roundIndex={state.rounds.length - 1}
+                  roundIndex={state.rounds.indexOf(currentRound)}
                   onSubmitResults={onSubmitResults}
                   animationDelay={index}
                   allowEdit={currentRound.isComplete}
@@ -189,7 +202,7 @@ export function Top8Page({
             className="btn-imperial-filled py-3 px-8 flex items-center gap-2 mx-auto"
           >
             <ChevronRight size={18} />
-            {currentRound?.type === "semifinal" ? "Generate Finals" : "Generate Grand Final"}
+            {currentRound?.type === "semifinal" ? "Generate Winners & Losers" : "Generate Grand Final"}
           </button>
         </motion.div>
       )}
@@ -226,7 +239,7 @@ export function Top8Page({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
             >
-              <Leaderboard players={state.players} highlightTop={8} finalStandings={finalStandings} />
+              <Leaderboard players={state.players} highlightTop={16} finalStandings={finalStandings} />
             </motion.div>
           )}
         </div>

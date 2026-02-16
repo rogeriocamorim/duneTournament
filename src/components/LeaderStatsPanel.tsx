@@ -73,14 +73,12 @@ export function LeaderStatsPanel({ rounds }: LeaderStatsPanelProps) {
       {/* Stats table */}
       <div className="overflow-x-auto">
         {/* Header */}
-        <div className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_3.5rem_4rem_4rem_5rem] gap-2 px-4 py-2 text-xs uppercase tracking-[0.15em] opacity-50 min-w-[540px]">
+        <div className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_4rem_5rem] gap-2 px-4 py-2 text-xs uppercase tracking-[0.15em] opacity-50 min-w-[400px]">
           <span>T</span>
           <span>Leader</span>
           <span className="text-center">Plays</span>
           <span className="text-center">Wins</span>
-          <span className="text-center">Top 2</span>
           <span className="text-right">Avg VP</span>
-          <span className="text-right">Avg Pos</span>
           <span className="text-right">Win Rate</span>
         </div>
 
@@ -93,7 +91,7 @@ export function LeaderStatsPanel({ rounds }: LeaderStatsPanelProps) {
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.03 }}
-              className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_3.5rem_4rem_4rem_5rem] gap-2 px-4 py-3 rounded-sm glass-morphism mb-1 min-w-[540px]"
+              className="grid grid-cols-[2rem_1fr_3.5rem_3.5rem_4rem_5rem] gap-2 px-4 py-3 rounded-sm glass-morphism mb-1 min-w-[400px]"
             >
               {/* Tier badge */}
               <span
@@ -112,14 +110,8 @@ export function LeaderStatsPanel({ rounds }: LeaderStatsPanelProps) {
               <span className="text-score text-sm text-center text-spice self-center">
                 {stat.wins}
               </span>
-              <span className="text-score text-sm text-center opacity-70 self-center">
-                {stat.top2}
-              </span>
               <span className="text-score text-sm text-right opacity-70 self-center">
                 {stat.plays > 0 ? (stat.totalVP / stat.plays).toFixed(1) : "—"}
-              </span>
-              <span className="text-score text-sm text-right opacity-70 self-center">
-                {stat.avgPosition.toFixed(1)}
               </span>
               <span
                 className={`text-score text-sm text-right font-bold self-center ${

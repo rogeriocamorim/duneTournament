@@ -160,7 +160,7 @@ export function DashboardPage({
                   Qualifying Complete
                 </h2>
                 <p className="text-sm text-sand-dark mb-4">
-                  The top 8 players advance to the Landsraad Finals.
+                  The top 16 players advance to the Landsraad Finals.
                 </p>
                 <button
                   onClick={onStartTop8}
@@ -190,7 +190,7 @@ export function DashboardPage({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {currentRound.tables.map((table, index) => (
                   <TableCard
-                    key={table.id}
+                    key={`r${currentRound.number}-t${table.id}`}
                     table={table}
                     players={state.players}
                     roundIndex={state.rounds.length - 1}
@@ -225,7 +225,7 @@ export function DashboardPage({
         >
           <Leaderboard
             players={state.players}
-            highlightTop={qualifyingDone ? 8 : 0}
+            highlightTop={qualifyingDone ? 16 : 0}
           />
         </motion.div>
       )}
