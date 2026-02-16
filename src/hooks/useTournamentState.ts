@@ -29,6 +29,7 @@ type Action =
   | { type: "START_TOP8" }
   | { type: "GENERATE_TOP8_ROUND" }
   | { type: "IMPORT_STATE"; state: TournamentState }
+  | { type: "TOGGLE_DRAMATIC_REVEAL" }
   | { type: "RESET" };
 
 // ===== REDUCER =====
@@ -194,6 +195,16 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
       return action.state;
     }
 
+    case "TOGGLE_DRAMATIC_REVEAL": {
+      return {
+        ...state,
+        settings: {
+          ...state.settings,
+          dramaticReveal: !state.settings.dramaticReveal,
+        },
+      };
+    }
+
     case "RESET": {
       return { ...DEFAULT_STATE, metadata: { ...DEFAULT_STATE.metadata, timestamp: new Date().toISOString() } };
     }
@@ -272,6 +283,10 @@ export function useTournamentState() {
     dispatch({ type: "RESET" });
   }, []);
 
+  const toggleDramaticReveal = useCallback(() => {
+    dispatch({ type: "TOGGLE_DRAMATIC_REVEAL" });
+  }, []);
+
   const standings = state.phase === "finished"
     ? getFinalStandings(state)
     : getStandings(state.players);
@@ -303,5 +318,6 @@ export function useTournamentState() {
     importState,
     exportState,
     resetTournament,
+    toggleDramaticReveal,
   };
 }

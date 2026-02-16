@@ -42,7 +42,7 @@ function makeState(players: Player[]): TournamentState {
     rounds: [],
     phase: "top8",
     currentRound: 5,
-    settings: { totalQualifyingRounds: 4, topCut: 16 },
+    settings: { totalQualifyingRounds: 4, topCut: 16, dramaticReveal: false },
   };
 }
 

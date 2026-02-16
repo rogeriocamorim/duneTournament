@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { useState, useRef, useCallback } from "react";
 import { TableCard } from "../components/TableCard";
+import { DramaticReveal } from "../components/DramaticReveal";
 import { Leaderboard } from "../components/Leaderboard";
 import { LeaderStatsPanel } from "../components/LeaderStatsPanel";
 import type { TournamentState, TableResult } from "../engine/types";
@@ -11,6 +12,7 @@ interface DashboardPageProps {
   onGenerateRound: () => void;
   onSubmitResults: (roundIndex: number, tableId: number, results: TableResult[]) => void;
   onStartTop8: () => void;
+  dramaticReveal: boolean;
 }
 
 type TabView = "tables" | "standings" | "leaders";
@@ -20,6 +22,7 @@ export function DashboardPage({
   onGenerateRound,
   onSubmitResults,
   onStartTop8,
+  dramaticReveal,
 }: DashboardPageProps) {
   const [activeTab, setActiveTab] = useState<TabView>("tables");
   const [_showExplosion, setShowExplosion] = useState(false);
@@ -187,19 +190,22 @@ export function DashboardPage({
                   ? "Grand Final"
                   : currentRound.type}
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {currentRound.tables.map((table, index) => (
+              <DramaticReveal
+                roundKey={`qualifying-r${currentRound.number}`}
+                enabled={dramaticReveal && !currentRound.isComplete}
+                labels={currentRound.tables.map((t) => `Table #${t.id}`)}
+                items={currentRound.tables.map((table, index) => (
                   <TableCard
                     key={`r${currentRound.number}-t${table.id}`}
                     table={table}
                     players={state.players}
                     roundIndex={state.rounds.length - 1}
                     onSubmitResults={onSubmitResults}
-                    animationDelay={index}
+                    animationDelay={dramaticReveal ? 0 : index}
                     allowEdit={currentRound.isComplete}
                   />
                 ))}
-              </div>
+              />
             </div>
           )}
 

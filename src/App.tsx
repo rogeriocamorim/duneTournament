@@ -9,6 +9,7 @@ import { SandstormTransition } from "./components/animations/SandstormTransition
 import {
   RotateCcw,
   Database,
+  Sparkles,
 } from "lucide-react";
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
     importState,
     exportState,
     resetTournament,
+    toggleDramaticReveal,
   } = useTournamentState();
 
   const [showNavigator, setShowNavigator] = useState(false);
@@ -85,6 +87,17 @@ function App() {
 
           <div className="flex items-center gap-2">
             <button
+              onClick={toggleDramaticReveal}
+              className={`p-2 transition-colors ${
+                state.settings.dramaticReveal
+                  ? "text-spice"
+                  : "text-sand-dark hover:text-spice"
+              }`}
+              title={`Dramatic Reveal: ${state.settings.dramaticReveal ? "ON" : "OFF"}`}
+            >
+              <Sparkles size={16} />
+            </button>
+            <button
               onClick={() => setShowNavigator(true)}
               className="p-2 text-sand-dark hover:text-spice transition-colors"
               title="Guild Navigator (Import/Export)"
@@ -134,6 +147,7 @@ function App() {
               onGenerateRound={generateRound}
               onSubmitResults={submitTableResults}
               onStartTop8={handleStartTop8}
+              dramaticReveal={state.settings.dramaticReveal}
             />
           </motion.div>
         )}
@@ -150,6 +164,7 @@ function App() {
               onSubmitResults={submitTableResults}
               onGenerateTop8Round={generateTop8Round}
               onStartTop8={startTop8}
+              dramaticReveal={state.settings.dramaticReveal}
             />
           </motion.div>
         )}

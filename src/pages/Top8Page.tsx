@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { useState } from "react";
 import { TableCard } from "../components/TableCard";
+import { DramaticReveal } from "../components/DramaticReveal";
 import { Leaderboard } from "../components/Leaderboard";
 import type { TournamentState, TableResult } from "../engine/types";
 import { getTop8, getFinalStandings } from "../engine/tournament";
@@ -15,6 +16,7 @@ interface Top8PageProps {
   onSubmitResults: (roundIndex: number, tableId: number, results: TableResult[]) => void;
   onGenerateTop8Round: () => void;
   onStartTop8: () => void;
+  dramaticReveal: boolean;
 }
 
 export function Top8Page({
@@ -22,6 +24,7 @@ export function Top8Page({
   onSubmitResults,
   onGenerateTop8Round,
   onStartTop8,
+  dramaticReveal,
 }: Top8PageProps) {
   const [showStandings, setShowStandings] = useState(false);
   const top8 = getTop8(state);
@@ -166,8 +169,11 @@ export function Top8Page({
               <h2 className="text-display text-sm text-center text-sand-dark mb-4">
                 Round {currentRound.number} — Elite Bracket (1-8)
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                {currentRound.tables.slice(0, 2).map((table, index) => (
+              <DramaticReveal
+                roundKey={`elite-r${currentRound.number}`}
+                enabled={dramaticReveal && !currentRound.isComplete}
+                labels={ELITE_TABLE_LABELS}
+                items={currentRound.tables.slice(0, 2).map((table, index) => (
                   <div key={`r${currentRound.number}-t${table.id}`}>
                     <p className="text-xs text-center text-spice uppercase tracking-widest mb-2">
                       {ELITE_TABLE_LABELS[index] ?? `Table ${index + 1}`}
@@ -177,19 +183,22 @@ export function Top8Page({
                       players={state.players}
                       roundIndex={state.rounds.indexOf(currentRound)}
                       onSubmitResults={onSubmitResults}
-                      animationDelay={index}
+                      animationDelay={dramaticReveal ? 0 : index}
                       allowEdit={currentRound.isComplete}
                     />
                   </div>
                 ))}
-              </div>
+              />
 
               {/* Challenger Bracket */}
-              <h2 className="text-display text-sm text-center text-sand-dark mb-4">
+              <h2 className="text-display text-sm text-center text-sand-dark mb-4 mt-6">
                 Round {currentRound.number} — Challenger Bracket (9-16)
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {currentRound.tables.slice(2, 4).map((table, index) => (
+              <DramaticReveal
+                roundKey={`challenger-r${currentRound.number}`}
+                enabled={dramaticReveal && !currentRound.isComplete}
+                labels={CHALLENGER_TABLE_LABELS}
+                items={currentRound.tables.slice(2, 4).map((table, index) => (
                   <div key={`r${currentRound.number}-t${table.id}`}>
                     <p className="text-xs text-center text-sand-dark uppercase tracking-widest mb-2">
                       {CHALLENGER_TABLE_LABELS[index] ?? `Table ${index + 3}`}
@@ -199,12 +208,12 @@ export function Top8Page({
                       players={state.players}
                       roundIndex={state.rounds.indexOf(currentRound)}
                       onSubmitResults={onSubmitResults}
-                      animationDelay={index + 2}
+                      animationDelay={dramaticReveal ? 0 : index + 2}
                       allowEdit={currentRound.isComplete}
                     />
                   </div>
                 ))}
-              </div>
+              />
             </>
           )}
 
@@ -214,8 +223,11 @@ export function Top8Page({
               <h2 className="text-display text-sm text-center text-sand-dark mb-4">
                 Round {currentRound.number} — Redemption Round
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {currentRound.tables.map((table, index) => (
+              <DramaticReveal
+                roundKey={`redemption-r${currentRound.number}`}
+                enabled={dramaticReveal && !currentRound.isComplete}
+                labels={REDEMPTION_LABELS}
+                items={currentRound.tables.map((table, index) => (
                   <div key={`r${currentRound.number}-t${table.id}`}>
                     <p className="text-xs text-center text-spice uppercase tracking-widest mb-2">
                       {REDEMPTION_LABELS[index] ?? `Redemption ${index + 1}`}
@@ -225,12 +237,12 @@ export function Top8Page({
                       players={state.players}
                       roundIndex={state.rounds.indexOf(currentRound)}
                       onSubmitResults={onSubmitResults}
-                      animationDelay={index}
+                      animationDelay={dramaticReveal ? 0 : index}
                       allowEdit={currentRound.isComplete}
                     />
                   </div>
                 ))}
-              </div>
+              />
             </>
           )}
 
@@ -240,20 +252,23 @@ export function Top8Page({
               <h2 className="text-display text-sm text-center text-sand-dark mb-4">
                 Round {currentRound.number} — Grand Final
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {currentRound.tables.map((table, index) => (
+              <DramaticReveal
+                roundKey={`grand-final-r${currentRound.number}`}
+                enabled={dramaticReveal && !currentRound.isComplete}
+                labels={["Grand Final"]}
+                items={currentRound.tables.map((table, index) => (
                   <div key={`r${currentRound.number}-t${table.id}`}>
                     <TableCard
                       table={table}
                       players={state.players}
                       roundIndex={state.rounds.indexOf(currentRound)}
                       onSubmitResults={onSubmitResults}
-                      animationDelay={index}
+                      animationDelay={dramaticReveal ? 0 : index}
                       allowEdit={currentRound.isComplete}
                     />
                   </div>
                 ))}
-              </div>
+              />
             </>
           )}
         </div>
