@@ -6,8 +6,9 @@ import type { TournamentState, TableResult } from "../engine/types";
 import { getTop8, getFinalStandings } from "../engine/tournament";
 import { Trophy, Crown, Swords, ChevronRight, BarChart3 } from "lucide-react";
 
-const SEMI_TABLE_LABELS = ["Table A", "Table B", "Table C", "Table D"];
-const ROUND6_TABLE_LABELS = ["Winners 1", "Winners 2", "Losers 1", "Losers 2"];
+const ELITE_TABLE_LABELS = ["Elite Table A", "Elite Table B"];
+const CHALLENGER_TABLE_LABELS = ["Challenger Table C", "Challenger Table D"];
+const REDEMPTION_LABELS = ["Trial of Gom Jabbar", "Water of Life"];
 
 interface Top8PageProps {
   state: TournamentState;
@@ -158,35 +159,103 @@ export function Top8Page({
       {/* Current Round Tables */}
       {currentRound && (currentRound.type === "semifinal" || currentRound.type === "winners-final" || currentRound.type === "losers-final" || currentRound.type === "grand-final") && (
         <div className="mb-8">
-          <h2 className="text-display text-sm text-center text-sand-dark mb-4">
-            {currentRound.type === "semifinal" && "Round 5 — Semifinals"}
-            {currentRound.type === "winners-final" && "Round 6 — Winners & Losers"}
-            {currentRound.type === "grand-final" && "Round 7 — Grand Final"}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {currentRound.tables.map((table, index) => (
-              <div key={`r${currentRound.number}-t${table.id}`}>
-                {currentRound.type === "semifinal" && (
-                  <p className="text-xs text-center text-spice uppercase tracking-widest mb-2">
-                    {SEMI_TABLE_LABELS[index] ?? `Table ${index + 1}`}
-                  </p>
-                )}
-                {currentRound.type === "winners-final" && (
-                  <p className={`text-xs text-center uppercase tracking-widest mb-2 ${index < 2 ? "text-spice" : "text-sand-dark"}`}>
-                    {ROUND6_TABLE_LABELS[index] ?? `Table ${index + 1}`}
-                  </p>
-                )}
-                <TableCard
-                  table={table}
-                  players={state.players}
-                  roundIndex={state.rounds.indexOf(currentRound)}
-                  onSubmitResults={onSubmitResults}
-                  animationDelay={index}
-                  allowEdit={currentRound.isComplete}
-                />
+          {/* ── Semifinals: split into Elite & Challenger sections ── */}
+          {currentRound.type === "semifinal" && (
+            <>
+              {/* Elite Bracket */}
+              <h2 className="text-display text-sm text-center text-sand-dark mb-4">
+                Round {currentRound.number} — Elite Bracket (1-8)
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {currentRound.tables.slice(0, 2).map((table, index) => (
+                  <div key={`r${currentRound.number}-t${table.id}`}>
+                    <p className="text-xs text-center text-spice uppercase tracking-widest mb-2">
+                      {ELITE_TABLE_LABELS[index] ?? `Table ${index + 1}`}
+                    </p>
+                    <TableCard
+                      table={table}
+                      players={state.players}
+                      roundIndex={state.rounds.indexOf(currentRound)}
+                      onSubmitResults={onSubmitResults}
+                      animationDelay={index}
+                      allowEdit={currentRound.isComplete}
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+
+              {/* Challenger Bracket */}
+              <h2 className="text-display text-sm text-center text-sand-dark mb-4">
+                Round {currentRound.number} — Challenger Bracket (9-16)
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {currentRound.tables.slice(2, 4).map((table, index) => (
+                  <div key={`r${currentRound.number}-t${table.id}`}>
+                    <p className="text-xs text-center text-sand-dark uppercase tracking-widest mb-2">
+                      {CHALLENGER_TABLE_LABELS[index] ?? `Table ${index + 3}`}
+                    </p>
+                    <TableCard
+                      table={table}
+                      players={state.players}
+                      roundIndex={state.rounds.indexOf(currentRound)}
+                      onSubmitResults={onSubmitResults}
+                      animationDelay={index + 2}
+                      allowEdit={currentRound.isComplete}
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* ── Redemption Round ── */}
+          {currentRound.type === "winners-final" && (
+            <>
+              <h2 className="text-display text-sm text-center text-sand-dark mb-4">
+                Round {currentRound.number} — Redemption Round
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {currentRound.tables.map((table, index) => (
+                  <div key={`r${currentRound.number}-t${table.id}`}>
+                    <p className="text-xs text-center text-spice uppercase tracking-widest mb-2">
+                      {REDEMPTION_LABELS[index] ?? `Redemption ${index + 1}`}
+                    </p>
+                    <TableCard
+                      table={table}
+                      players={state.players}
+                      roundIndex={state.rounds.indexOf(currentRound)}
+                      onSubmitResults={onSubmitResults}
+                      animationDelay={index}
+                      allowEdit={currentRound.isComplete}
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* ── Grand Final ── */}
+          {currentRound.type === "grand-final" && (
+            <>
+              <h2 className="text-display text-sm text-center text-sand-dark mb-4">
+                Round {currentRound.number} — Grand Final
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {currentRound.tables.map((table, index) => (
+                  <div key={`r${currentRound.number}-t${table.id}`}>
+                    <TableCard
+                      table={table}
+                      players={state.players}
+                      roundIndex={state.rounds.indexOf(currentRound)}
+                      onSubmitResults={onSubmitResults}
+                      animationDelay={index}
+                      allowEdit={currentRound.isComplete}
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -202,7 +271,7 @@ export function Top8Page({
             className="btn-imperial-filled py-3 px-8 flex items-center gap-2 mx-auto"
           >
             <ChevronRight size={18} />
-            {currentRound?.type === "semifinal" ? "Generate Winners & Losers" : "Generate Grand Final"}
+            {currentRound?.type === "semifinal" ? "Generate Redemption Round" : "Generate Grand Final"}
           </button>
         </motion.div>
       )}
