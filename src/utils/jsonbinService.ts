@@ -1,41 +1,31 @@
 // ===== JSONBIN.IO SERVICE =====
-// Handles master pointer storage that always points to the latest standings Gist
+// Handles direct storage of tournament standings data in JSONBin.io
 
-export interface MasterPointer {
-  latestGistId: string;
-  tournamentName: string;
-  lastUpdated: string;
-}
+import type { StandingsSnapshot } from "./gistService";
 
-// Generate a simple master key for JSONBin.io (stored in localStorage)
-function generateMasterKey(): string {
-  // JSONBin.io accepts any string as a master key for anonymous bins
-  // We'll generate a random one and store it locally
-  return `dune-tournament-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
-}
+// JSONBin.io API key from environment variable (free tier: 10k requests/month)
+// Set VITE_JSONBIN_API_KEY in your build environment
+const JSONBIN_API_KEY = import.meta.env.VITE_JSONBIN_API_KEY || "";
+
+// DEBUG: Log the API key to verify it's loaded (remove in production)
+console.log("🔑 JSONBin API Key loaded:", JSONBIN_API_KEY ? `${JSONBIN_API_KEY.substring(0, 10)}...` : "MISSING");
 
 /**
- * Creates a new JSONBin master pointer.
- * Returns both the bin ID (shareable) and master key (private, for updates).
+ * Creates a new JSONBin with standings data.
+ * Returns the bin ID (shareable).
  */
-export async function createMasterPointer(
-  initialGistId: string,
+export async function createStandingsBin(
+  standings: StandingsSnapshot,
   tournamentName: string
-): Promise<{ binId: string; masterKey: string }> {
-  const masterKey = generateMasterKey();
-
+): Promise<string> {
   const response = await fetch("https://api.jsonbin.io/v3/b", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Master-Key": masterKey,
+      "X-Master-Key": JSONBIN_API_KEY,
       "X-Bin-Name": `dune-tournament-${tournamentName.replace(/\s+/g, "-")}`,
     },
-    body: JSON.stringify({
-      latestGistId: initialGistId,
-      tournamentName,
-      lastUpdated: new Date().toISOString(),
-    }),
+    body: JSON.stringify(standings),
   });
 
   if (!response.ok) {
@@ -44,32 +34,23 @@ export async function createMasterPointer(
   }
 
   const result = await response.json();
-  return {
-    binId: result.metadata.id,
-    masterKey,
-  };
+  return result.metadata.id;
 }
 
 /**
- * Updates an existing JSONBin master pointer with a new Gist ID.
+ * Updates an existing JSONBin with new standings data.
  */
-export async function updateMasterPointer(
+export async function updateStandingsBin(
   binId: string,
-  masterKey: string,
-  newGistId: string,
-  tournamentName: string
+  standings: StandingsSnapshot
 ): Promise<void> {
   const response = await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
-      "X-Master-Key": masterKey,
+      "X-Master-Key": JSONBIN_API_KEY,
     },
-    body: JSON.stringify({
-      latestGistId: newGistId,
-      tournamentName,
-      lastUpdated: new Date().toISOString(),
-    }),
+    body: JSON.stringify(standings),
   });
 
   if (!response.ok) {
@@ -79,9 +60,9 @@ export async function updateMasterPointer(
 }
 
 /**
- * Fetches the master pointer from JSONBin (public read, no auth needed).
+ * Fetches standings data from JSONBin (public read, no auth needed).
  */
-export async function fetchMasterPointer(binId: string): Promise<MasterPointer> {
+export async function fetchStandingsBin(binId: string): Promise<StandingsSnapshot> {
   const response = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`);
 
   if (!response.ok) {
@@ -89,5 +70,6 @@ export async function fetchMasterPointer(binId: string): Promise<MasterPointer> 
   }
 
   const result = await response.json();
-  return result.record as MasterPointer;
+  return result.record as StandingsSnapshot;
 }
+

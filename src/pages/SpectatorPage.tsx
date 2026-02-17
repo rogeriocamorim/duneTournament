@@ -2,18 +2,17 @@ import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Leaderboard } from "../components/Leaderboard";
-import { fetchMasterPointer } from "../utils/jsonbinService";
-import { fetchStandingsGist } from "../utils/gistService";
+import { fetchStandingsPaste } from "../utils/pasteService";
 import type { StandingsSnapshot } from "../utils/gistService";
 import type { Player } from "../engine/types";
 
 interface SpectatorPageProps {
-  binId: string;
+  pasteId: string; // dpaste ID (e.g., "ABC123")
 }
 
 type LoadingState = "loading" | "success" | "error";
 
-export function SpectatorPage({ binId }: SpectatorPageProps) {
+export function SpectatorPage({ pasteId }: SpectatorPageProps) {
   const [state, setState] = useState<LoadingState>("loading");
   const [snapshot, setSnapshot] = useState<StandingsSnapshot | null>(null);
   const [error, setError] = useState<string>("");
@@ -23,11 +22,9 @@ export function SpectatorPage({ binId }: SpectatorPageProps) {
     setError("");
 
     try {
-      // Step 1: Fetch master pointer from JSONBin
-      const masterPointer = await fetchMasterPointer(binId);
-
-      // Step 2: Fetch actual standings from GitHub Gist
-      const standingsData = await fetchStandingsGist(masterPointer.latestGistId);
+      // Fetch standings data from dpaste
+      const pasteUrl = `https://dpaste.com/${pasteId}`;
+      const standingsData = await fetchStandingsPaste(pasteUrl);
 
       setSnapshot(standingsData);
       setState("success");
@@ -44,7 +41,7 @@ export function SpectatorPage({ binId }: SpectatorPageProps) {
 
   useEffect(() => {
     loadStandings();
-  }, [binId]);
+  }, [pasteId]);
 
   // Convert snapshot standings to Player format for Leaderboard component
   const players: Player[] = snapshot

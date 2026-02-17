@@ -14,9 +14,8 @@ import {
   getStandings,
   getFinalStandings,
 } from "../engine/tournament";
-import { createStandingsGist } from "../utils/gistService";
 import type { StandingsSnapshot } from "../utils/gistService";
-import { createMasterPointer, updateMasterPointer } from "../utils/jsonbinService";
+import { createStandingsBin, updateStandingsBin } from "../utils/jsonbinService";
 
 const STORAGE_KEY = "dune_tournament_state";
 
@@ -343,30 +342,25 @@ export function useTournamentState() {
       })),
     };
 
-    // Create standings Gist
-    const standingsGistId = await createStandingsGist(snapshot);
-
-    // If first time sharing, create master pointer
-    if (!state.metadata.jsonbinId || !state.metadata.jsonbinKey) {
-      const { binId, masterKey } = await createMasterPointer(
-        standingsGistId,
+    // If first time sharing, create new JSONBin
+    if (!state.metadata.jsonbinId) {
+      const binId = await createStandingsBin(
+        snapshot,
         state.metadata.tournamentName
       );
       
-      // Store JSONBin info in state
-      dispatch({ type: "SET_JSONBIN_INFO", binId, binKey: masterKey });
+      // Store JSONBin ID in state
+      dispatch({ type: "SET_JSONBIN_INFO", binId, binKey: "" });
       
       // Return shareable URL
       const baseUrl = window.location.origin + window.location.pathname;
       return `${baseUrl}?view=${binId}`;
     }
 
-    // Update existing master pointer
-    await updateMasterPointer(
+    // Update existing JSONBin with new standings
+    await updateStandingsBin(
       state.metadata.jsonbinId,
-      state.metadata.jsonbinKey,
-      standingsGistId,
-      state.metadata.tournamentName
+      snapshot
     );
 
     // Return same shareable URL

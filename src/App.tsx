@@ -98,7 +98,7 @@ function App() {
 
   // If in spectator mode, render SpectatorPage only
   if (spectatorBinId) {
-    return <SpectatorPage binId={spectatorBinId} />;
+    return <SpectatorPage pasteId={spectatorBinId} />;
   }
 
   return (
