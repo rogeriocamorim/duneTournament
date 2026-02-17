@@ -34,7 +34,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_JSONBIN_API_KEY: ${{ secrets.JSONBIN_API_KEY }}
+          VITE_JSONBIN_API_KEY: ${{ secrets.JSONBIN }}
         
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
