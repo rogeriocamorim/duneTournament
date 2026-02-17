@@ -35,12 +35,27 @@ body {
   font-family: var(--font-display);
   background-image: url("./assets/background.png");
   background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
+  background-position: center top;
   background-repeat: no-repeat;
+  background-color: var(--color-obsidian);
   color: var(--color-sand);
   min-height: 100vh;
   overflow-x: hidden;
+}
+
+/* Desktop: fixed background for parallax effect */
+@media (min-width: 768px) {
+  body {
+    background-attachment: fixed;
+  }
+}
+
+/* Mobile: scroll background to prevent rendering issues */
+@media (max-width: 767px) {
+  body {
+    background-attachment: scroll;
+    background-size: 100% auto;
+  }
 }
 
 body::before {

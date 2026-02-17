@@ -15,12 +15,11 @@ export function Leaderboard({ players, highlightTop = 0, finalStandings }: Leade
   return (
     <div className="space-y-2">
       {/* Header */}
-      <div className="grid grid-cols-[3rem_1fr_4rem_4rem_4rem] gap-2 px-4 py-2 text-xs uppercase tracking-[0.2em] opacity-50">
+      <div className="grid grid-cols-[3rem_1fr_4rem_4rem] gap-2 px-4 py-2 text-xs uppercase tracking-[0.2em] opacity-50">
         <span>#</span>
         <span>Player</span>
         <span className="text-right">Pts</span>
         <span className="text-right">VP</span>
-        <span className="text-right">Eff</span>
       </div>
 
       {/* Players */}
@@ -40,7 +39,7 @@ export function Leaderboard({ players, highlightTop = 0, finalStandings }: Leade
               opacity: { duration: 0.3, delay: index * 0.03 },
             }}
             className={`
-              grid grid-cols-[3rem_1fr_4rem_4rem_4rem] gap-2 px-4 py-3 rounded-sm
+              grid grid-cols-[3rem_1fr_4rem_4rem] gap-2 px-4 py-3 rounded-sm
               ${isTopCut ? "stone-card spice-glow" : "glass-morphism"}
               ${rank === 1 ? "border-l-4 border-l-[#FFD700]" : ""}
               ${rank === 2 ? "border-l-4 border-l-[#C0C0C0]" : ""}
@@ -62,9 +61,6 @@ export function Leaderboard({ players, highlightTop = 0, finalStandings }: Leade
             </span>
             <span className="text-score text-right text-sm opacity-70">
               {player.totalVP}
-            </span>
-            <span className="text-score text-right text-sm opacity-50">
-              {player.efficiency}
             </span>
           </motion.div>
         );
