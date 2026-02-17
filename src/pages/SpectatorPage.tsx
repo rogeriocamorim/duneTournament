@@ -2,12 +2,12 @@ import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Leaderboard } from "../components/Leaderboard";
-import { fetchStandingsPaste } from "../utils/pasteService";
+import { fetchStandingsBin } from "../utils/jsonbinService";
 import type { StandingsSnapshot } from "../utils/gistService";
 import type { Player } from "../engine/types";
 
 interface SpectatorPageProps {
-  pasteId: string; // dpaste ID (e.g., "ABC123")
+  pasteId: string; // JSONBin ID (e.g., "6993da5aae596e708f30912e")
 }
 
 type LoadingState = "loading" | "success" | "error";
@@ -22,9 +22,8 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
     setError("");
 
     try {
-      // Fetch standings data from dpaste
-      const pasteUrl = `https://dpaste.com/${pasteId}`;
-      const standingsData = await fetchStandingsPaste(pasteUrl);
+      // Fetch standings data from JSONBin
+      const standingsData = await fetchStandingsBin(pasteId);
 
       setSnapshot(standingsData);
       setState("success");

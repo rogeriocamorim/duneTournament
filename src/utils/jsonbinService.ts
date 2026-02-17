@@ -7,9 +7,6 @@ import type { StandingsSnapshot } from "./gistService";
 // Set VITE_JSONBIN_API_KEY in your build environment
 const JSONBIN_API_KEY = import.meta.env.VITE_JSONBIN_API_KEY || "";
 
-// DEBUG: Log the API key to verify it's loaded (remove in production)
-console.log("🔑 JSONBin API Key loaded:", JSONBIN_API_KEY ? `${JSONBIN_API_KEY.substring(0, 10)}...` : "MISSING");
-
 /**
  * Creates a new JSONBin with standings data.
  * Returns the bin ID (shareable).
@@ -24,6 +21,7 @@ export async function createStandingsBin(
       "Content-Type": "application/json",
       "X-Master-Key": JSONBIN_API_KEY,
       "X-Bin-Name": `dune-tournament-${tournamentName.replace(/\s+/g, "-")}`,
+      "X-Bin-Private": "false", // Make bin publicly readable
     },
     body: JSON.stringify(standings),
   });
@@ -60,7 +58,7 @@ export async function updateStandingsBin(
 }
 
 /**
- * Fetches standings data from JSONBin (public read, no auth needed).
+ * Fetches standings data from a public JSONBin (no auth required).
  */
 export async function fetchStandingsBin(binId: string): Promise<StandingsSnapshot> {
   const response = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`);
