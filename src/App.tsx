@@ -1,19 +1,33 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useTournamentState } from "./hooks/useTournamentState";
 import { RegistrationPage } from "./pages/RegistrationPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { Top8Page } from "./pages/Top8Page";
+import { SpectatorPage } from "./pages/SpectatorPage";
 import { GuildNavigator } from "./components/GuildNavigator";
+import { ShareModal } from "./components/ShareModal";
 import { SandstormTransition } from "./components/animations/SandstormTransition";
 import {
   RotateCcw,
   Database,
   Sparkles,
+  Share2,
 } from "lucide-react";
 
 
 function App() {
+  // Check for spectator mode from URL params
+  const [spectatorBinId, setSpectatorBinId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const binId = params.get("view");
+    if (binId) {
+      setSpectatorBinId(binId);
+    }
+  }, []);
+
   const {
     state,
     addPlayer,
@@ -27,9 +41,13 @@ function App() {
     exportState,
     resetTournament,
     toggleDramaticReveal,
+    generateShareableLink,
   } = useTournamentState();
 
   const [showNavigator, setShowNavigator] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string>("");
+  const [sharingInProgress, setSharingInProgress] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
@@ -64,6 +82,25 @@ function App() {
     setShowResetConfirm(false);
   }, [resetTournament]);
 
+  const handleShare = useCallback(async () => {
+    setSharingInProgress(true);
+    try {
+      const url = await generateShareableLink();
+      setShareUrl(url);
+      setShowShareModal(true);
+    } catch (error) {
+      console.error("Failed to generate share link:", error);
+      alert("Failed to generate share link. Please try again.");
+    } finally {
+      setSharingInProgress(false);
+    }
+  }, [generateShareableLink]);
+
+  // If in spectator mode, render SpectatorPage only
+  if (spectatorBinId) {
+    return <SpectatorPage binId={spectatorBinId} />;
+  }
+
   return (
     <div className="min-h-screen relative">
       {/* Sandstorm Transition Overlay */}
@@ -94,6 +131,18 @@ function App() {
               title="Guild Navigator (Import/Export)"
             >
               <Database size={16} />
+            </button>
+            <button
+              onClick={handleShare}
+              disabled={sharingInProgress || state.phase === "registration"}
+              className={`p-2 transition-colors ${
+                sharingInProgress || state.phase === "registration"
+                  ? "text-sand-dark/30 cursor-not-allowed"
+                  : "text-sand-dark hover:text-fremen-blue"
+              }`}
+              title="Share Standings"
+            >
+              <Share2 size={16} className={sharingInProgress ? "animate-pulse" : ""} />
             </button>
             <button
               onClick={() => setShowResetConfirm(true)}
@@ -165,6 +214,13 @@ function App() {
         onClose={() => setShowNavigator(false)}
         onExport={exportState}
         onImport={importState}
+      />
+
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        shareUrl={shareUrl}
       />
 
       {/* Reset Confirmation */}

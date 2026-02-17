@@ -14,6 +14,9 @@ import {
   getStandings,
   getFinalStandings,
 } from "../engine/tournament";
+import { createStandingsGist } from "../utils/gistService";
+import type { StandingsSnapshot } from "../utils/gistService";
+import { createMasterPointer, updateMasterPointer } from "../utils/jsonbinService";
 
 const STORAGE_KEY = "dune_tournament_state";
 
@@ -30,6 +33,7 @@ type Action =
   | { type: "GENERATE_TOP8_ROUND" }
   | { type: "IMPORT_STATE"; state: TournamentState }
   | { type: "TOGGLE_DRAMATIC_REVEAL" }
+  | { type: "SET_JSONBIN_INFO"; binId: string; binKey: string }
   | { type: "RESET" };
 
 // ===== REDUCER =====
@@ -205,6 +209,17 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
       };
     }
 
+    case "SET_JSONBIN_INFO": {
+      return {
+        ...state,
+        metadata: {
+          ...state.metadata,
+          jsonbinId: action.binId,
+          jsonbinKey: action.binKey,
+        },
+      };
+    }
+
     case "RESET": {
       return { ...DEFAULT_STATE, metadata: { ...DEFAULT_STATE.metadata, timestamp: new Date().toISOString() } };
     }
@@ -304,6 +319,61 @@ export function useTournamentState() {
     URL.revokeObjectURL(url);
   }, [state]);
 
+  // Generate shareable link for spectators
+  const generateShareableLink = useCallback(async (): Promise<string> => {
+    // Build standings snapshot
+    const currentStandings = state.phase === "finished"
+      ? getFinalStandings(state)
+      : getStandings(state.players);
+
+    const snapshot: StandingsSnapshot = {
+      metadata: {
+        tournamentName: state.metadata.tournamentName,
+        timestamp: new Date().toISOString(),
+        currentRound: state.currentRound,
+        totalRounds: state.settings.totalQualifyingRounds,
+        phase: state.phase,
+      },
+      standings: currentStandings.map((player, index) => ({
+        rank: index + 1,
+        name: player.name,
+        points: player.points,
+        totalVP: player.totalVP,
+        efficiency: player.efficiency,
+      })),
+    };
+
+    // Create standings Gist
+    const standingsGistId = await createStandingsGist(snapshot);
+
+    // If first time sharing, create master pointer
+    if (!state.metadata.jsonbinId || !state.metadata.jsonbinKey) {
+      const { binId, masterKey } = await createMasterPointer(
+        standingsGistId,
+        state.metadata.tournamentName
+      );
+      
+      // Store JSONBin info in state
+      dispatch({ type: "SET_JSONBIN_INFO", binId, binKey: masterKey });
+      
+      // Return shareable URL
+      const baseUrl = window.location.origin + window.location.pathname;
+      return `${baseUrl}?view=${binId}`;
+    }
+
+    // Update existing master pointer
+    await updateMasterPointer(
+      state.metadata.jsonbinId,
+      state.metadata.jsonbinKey,
+      standingsGistId,
+      state.metadata.tournamentName
+    );
+
+    // Return same shareable URL
+    const baseUrl = window.location.origin + window.location.pathname;
+    return `${baseUrl}?view=${state.metadata.jsonbinId}`;
+  }, [state, dispatch]);
+
   return {
     state,
     standings,
@@ -319,5 +389,6 @@ export function useTournamentState() {
     exportState,
     resetTournament,
     toggleDramaticReveal,
+    generateShareableLink,
   };
 }

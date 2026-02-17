@@ -35,6 +35,8 @@ export interface TournamentState {
     version: string;
     timestamp: string;
     tournamentName: string;
+    jsonbinId?: string;  // JSONBin master pointer ID (shareable)
+    jsonbinKey?: string; // JSONBin access key (private, for updates)
   };
   players: Player[];
   rounds: Round[];
