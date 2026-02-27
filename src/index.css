@@ -27,33 +27,30 @@
 
 html {
   scroll-behavior: smooth;
+  background-color: var(--color-obsidian);
+  height: 100%;
 }
 
 body {
   margin: 0;
   padding: 0;
   font-family: var(--font-display);
-  background-image: url("./assets/background.png");
-  background-size: cover;
-  background-position: center top;
-  background-repeat: no-repeat;
+  background:
+    linear-gradient(to bottom, transparent 40%, var(--color-obsidian) 100%),
+    url("./assets/background.png") center top / cover no-repeat fixed;
   background-color: var(--color-obsidian);
   color: var(--color-sand);
-  min-height: 100vh;
+  min-height: 100%;
   overflow-x: hidden;
-}
-
-/* Desktop: fixed background for parallax effect */
-@media (min-width: 768px) {
-  body {
-    background-attachment: fixed;
-  }
 }
 
 /* Mobile: scroll background to prevent rendering issues */
 @media (max-width: 767px) {
   body {
-    background-attachment: scroll;
+    background:
+      linear-gradient(to bottom, transparent 40%, var(--color-obsidian) 100%),
+      url("./assets/background.png") center top / cover no-repeat scroll;
+    background-color: var(--color-obsidian);
   }
 }
 
