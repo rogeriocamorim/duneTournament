@@ -1,0 +1,30 @@
+{
+  "tournamentName": "Dune Bloodlines Open",
+  "totalRounds": 4,
+  "currentRound": 1,
+  "phase": "qualifying",
+  "players": [
+    {"id": "1", "name": "Duncan Idaho", "totalPoints": 5, "totalVP": 20, "opponents": [], "dropped": false, "leader": "none"},
+    {"id": "2", "name": "Gurney Halleck", "totalPoints": 3, "totalVP": 15, "opponents": [], "dropped": false, "leader": "none"},
+    {"id": "3", "name": "Paul Atreides", "totalPoints": 2, "totalVP": 12, "opponents": [], "dropped": false, "leader": "none"},
+    {"id": "4", "name": "Lady Jessica", "totalPoints": 1, "totalVP": 10, "opponents": [], "dropped": false, "leader": "none"}
+  ],
+  "rounds": [
+    {
+      "roundNumber": 1,
+      "tables": [
+        {
+          "tableNumber": 1,
+          "playerIds": ["1", "2", "3", "4"],
+          "results": [
+            {"playerId": "1", "placement": 1, "vp": 20},
+            {"playerId": "2", "placement": 2, "vp": 15},
+            {"playerId": "3", "placement": 3, "vp": 12},
+            {"playerId": "4", "placement": 4, "vp": 10}
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {}
+}
