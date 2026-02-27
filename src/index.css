@@ -35,22 +35,30 @@ body {
   margin: 0;
   padding: 0;
   font-family: var(--font-display);
-  background:
-    linear-gradient(to bottom, transparent 40%, var(--color-obsidian) 100%),
-    url("./assets/background.png") center top / cover no-repeat fixed;
   background-color: var(--color-obsidian);
   color: var(--color-sand);
   min-height: 100%;
   overflow-x: hidden;
 }
 
-/* Mobile: scroll background to prevent rendering issues */
+/* Background image via pseudo-element to crop out white border baked into the PNG */
+body::after {
+  content: "";
+  position: fixed;
+  /* Oversize by 5% on each side to crop the white border */
+  top: -5%;
+  left: -5%;
+  width: 110%;
+  height: 110%;
+  background: url("./assets/background.png") center center / cover no-repeat;
+  z-index: -2;
+  pointer-events: none;
+}
+
+/* Mobile: scroll instead of fixed to prevent rendering issues */
 @media (max-width: 767px) {
-  body {
-    background:
-      linear-gradient(to bottom, transparent 40%, var(--color-obsidian) 100%),
-      url("./assets/background.png") center top / cover no-repeat scroll;
-    background-color: var(--color-obsidian);
+  body::after {
+    position: absolute;
   }
 }
 
