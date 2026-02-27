@@ -54,7 +54,6 @@ body {
 @media (max-width: 767px) {
   body {
     background-attachment: scroll;
-    background-size: 100% auto;
   }
 }
 
