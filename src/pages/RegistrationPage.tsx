@@ -1,10 +1,11 @@
-import { motion } from "motion/react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { X, Users, Play } from "lucide-react";
 import { SandwormRegistration } from "../components/animations/SandwormRegistration";
 import type { Player } from "../engine/types";
 
-const INTRO_VIDEO_URL =
-  "https://www.canva.com/design/DAHCwjWwmKc/IU6i6iu-jQcoAxraRjjjPg/watch?utm_content=DAHCwjWwmKc&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h1bb3cdfd3b";
+const INTRO_VIDEO_EMBED_URL =
+  "https://www.canva.com/design/DAHCwjWwmKc/IU6i6iu-jQcoAxraRjjjPg/view?embed";
 
 interface RegistrationPageProps {
   players: Player[];
@@ -20,9 +21,47 @@ export function RegistrationPage({
   onStart,
 }: RegistrationPageProps) {
   const canStart = players.length >= 4;
+  const [showVideo, setShowVideo] = useState(false);
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
+      {/* Video Modal */}
+      <AnimatePresence>
+        {showVideo && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/85"
+            onClick={() => setShowVideo(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative w-[90vw] max-w-4xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setShowVideo(false)}
+                className="absolute -top-10 right-0 text-sand hover:text-spice transition-colors"
+              >
+                <X size={24} />
+              </button>
+              <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+                <iframe
+                  src={INTRO_VIDEO_EMBED_URL}
+                  className="absolute inset-0 w-full h-full rounded-sm shadow-2xl"
+                  allowFullScreen
+                  allow="autoplay"
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -45,7 +84,7 @@ export function RegistrationPage({
         className="flex justify-center mb-8"
       >
         <button
-          onClick={() => window.open(INTRO_VIDEO_URL, "_blank")}
+          onClick={() => setShowVideo(true)}
           className="btn-imperial flex items-center gap-2 px-6 py-2 text-sm uppercase tracking-widest"
         >
           <Play size={16} />
