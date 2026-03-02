@@ -1,7 +1,10 @@
 import { motion } from "motion/react";
-import { X, Users } from "lucide-react";
+import { X, Users, Play } from "lucide-react";
 import { SandwormRegistration } from "../components/animations/SandwormRegistration";
 import type { Player } from "../engine/types";
+
+const INTRO_VIDEO_URL =
+  "https://www.canva.com/design/DAHCwjWwmKc/IU6i6iu-jQcoAxraRjjjPg/watch?utm_content=DAHCwjWwmKc&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h1bb3cdfd3b";
 
 interface RegistrationPageProps {
   players: Player[];
@@ -32,6 +35,22 @@ export function RegistrationPage({
         <p className="text-sm text-sand-dark uppercase tracking-[0.3em]">
           Champions Rise to Claim Glory
         </p>
+      </motion.div>
+
+      {/* Play Video Button */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.3 }}
+        className="flex justify-center mb-8"
+      >
+        <button
+          onClick={() => window.open(INTRO_VIDEO_URL, "_blank")}
+          className="btn-imperial flex items-center gap-2 px-6 py-2 text-sm uppercase tracking-widest"
+        >
+          <Play size={16} />
+          Play Intro
+        </button>
       </motion.div>
 
       {/* Sandworm Registration */}
