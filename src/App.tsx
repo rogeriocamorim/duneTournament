@@ -8,11 +8,13 @@ import { SpectatorPage } from "./pages/SpectatorPage";
 import { GuildNavigator } from "./components/GuildNavigator";
 import { ShareModal } from "./components/ShareModal";
 import { SandstormTransition } from "./components/animations/SandstormTransition";
+import { verifyResetPassphrase } from "./engine/types";
 import {
   RotateCcw,
   Database,
   Sparkles,
   Share2,
+  Lock,
 } from "lucide-react";
 
 
@@ -50,6 +52,9 @@ function App() {
   const [sharingInProgress, setSharingInProgress] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetPassphrase, setResetPassphrase] = useState("");
+  const [resetError, setResetError] = useState(false);
+  const [resetVerifying, setResetVerifying] = useState(false);
 
   // ===== ESCAPE KEY HANDLER =====
   useEffect(() => {
@@ -90,10 +95,20 @@ function App() {
     });
   }, [transitionTo, startTop8]);
 
-  const handleReset = useCallback(() => {
-    resetTournament();
-    setShowResetConfirm(false);
-  }, [resetTournament]);
+  const handleReset = useCallback(async () => {
+    setResetVerifying(true);
+    setResetError(false);
+    const valid = await verifyResetPassphrase(resetPassphrase);
+    if (valid) {
+      resetTournament();
+      setShowResetConfirm(false);
+      setResetPassphrase("");
+      setResetError(false);
+    } else {
+      setResetError(true);
+    }
+    setResetVerifying(false);
+  }, [resetTournament, resetPassphrase]);
 
   const handleShare = useCallback(async () => {
     setSharingInProgress(true);
@@ -236,7 +251,7 @@ function App() {
         shareUrl={shareUrl}
       />
 
-      {/* Reset Confirmation */}
+      {/* Reset Confirmation with Passphrase */}
       <AnimatePresence>
         {showResetConfirm && (
           <>
@@ -245,7 +260,11 @@ function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setShowResetConfirm(false)}
+              onClick={() => {
+                setShowResetConfirm(false);
+                setResetPassphrase("");
+                setResetError(false);
+              }}
             />
             <motion.div
               className="fixed inset-0 flex items-center justify-center z-50 p-4"
@@ -254,28 +273,62 @@ function App() {
               exit={{ opacity: 0, scale: 0.9 }}
             >
               <div className="glass-morphism-strong rounded-sm p-8 max-w-sm w-full text-center">
-                <RotateCcw size={32} className="text-blood mx-auto mb-4" />
+                <Lock size={32} className="text-blood mx-auto mb-4" />
                 <h3 className="text-display text-lg text-spice mb-2">
                   Reset Tournament?
                 </h3>
                 <p className="text-sm text-sand-dark mb-6">
-                  This will destroy all tournament data. This action cannot be
-                  undone.
+                  This will destroy all tournament data. Enter the passphrase to confirm.
                 </p>
-                <div className="flex gap-3 justify-center">
-                  <button
-                    onClick={handleReset}
-                    className="px-6 py-2 bg-blood text-white uppercase tracking-widest text-sm font-bold cursor-pointer hover:bg-red-700 transition-colors"
-                  >
-                    Destroy
-                  </button>
-                  <button
-                    onClick={() => setShowResetConfirm(false)}
-                    className="btn-imperial text-sm py-2"
-                  >
-                    Cancel
-                  </button>
-                </div>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleReset();
+                  }}
+                >
+                  <input
+                    type="password"
+                    value={resetPassphrase}
+                    onChange={(e) => {
+                      setResetPassphrase(e.target.value);
+                      setResetError(false);
+                    }}
+                    placeholder="Enter passphrase..."
+                    className={`input-imperial w-full mb-3 text-center ${
+                      resetError ? "border-blood/60" : ""
+                    }`}
+                    autoFocus
+                  />
+                  {resetError && (
+                    <p className="text-blood text-xs mb-3 uppercase tracking-wider">
+                      Wrong passphrase
+                    </p>
+                  )}
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      type="submit"
+                      disabled={!resetPassphrase || resetVerifying}
+                      className={`px-6 py-2 bg-blood text-white uppercase tracking-widest text-sm font-bold transition-colors ${
+                        !resetPassphrase || resetVerifying
+                          ? "opacity-40 cursor-not-allowed"
+                          : "cursor-pointer hover:bg-red-700"
+                      }`}
+                    >
+                      {resetVerifying ? "Verifying..." : "Destroy"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowResetConfirm(false);
+                        setResetPassphrase("");
+                        setResetError(false);
+                      }}
+                      className="btn-imperial text-sm py-2"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
               </div>
             </motion.div>
           </>

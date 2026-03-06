@@ -158,6 +158,20 @@ export interface LeaderStat {
   winRate: number; // wins / roundsAvailable
 }
 
+// ===== RESET PROTECTION =====
+
+const RESET_PASSPHRASE_HASH =
+  "95561cf41e5eeac118ed1ff4498f8a5a5ad99f273ad6f88d050955b22de94957";
+
+/** Verify a passphrase against the stored SHA-256 hash using Web Crypto API. */
+export async function verifyResetPassphrase(input: string): Promise<boolean> {
+  const encoded = new TextEncoder().encode(input);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  return hashHex === RESET_PASSPHRASE_HASH;
+}
+
 // ===== JSON IMPORT/EXPORT SCHEMA =====
 
 export interface ExportSchema {
