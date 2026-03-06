@@ -70,7 +70,7 @@ export const DEFAULT_STATE: TournamentState = {
   settings: {
     totalQualifyingRounds: 4,
     topCut: 16,
-    dramaticReveal: false,
+    dramaticReveal: true,
   },
 };
 
