@@ -13,6 +13,9 @@ import {
   applyTableResults,
   getStandings,
   getFinalStandings,
+  getTierForRound,
+  selectRoundLeaders,
+  migrateLeaderNames,
 } from "../engine/tournament";
 import type { StandingsSnapshot } from "../utils/gistService";
 import { createStandingsBin, updateStandingsBin } from "../utils/jsonbinService";
@@ -74,11 +77,14 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
     case "GENERATE_ROUND": {
       const tables = generateSwissPairing(state);
       const roundNumber = state.rounds.length + 1;
+      const tier = getTierForRound(roundNumber, false);
+      const leaders = selectRoundLeaders(tier);
       const newRound: Round = {
         number: roundNumber,
         tables,
         isComplete: false,
         type: "qualifying",
+        availableLeaders: leaders.map((l) => l.name),
       };
       return {
         ...state,
@@ -133,11 +139,13 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
       const tables = generateSemifinals(state);
       if (tables.length === 0) return state;
 
+      const cLeaders = selectRoundLeaders("C");
       const newRound: Round = {
         number: state.rounds.length + 1,
         tables,
         isComplete: false,
         type: "semifinal",
+        availableLeaders: cLeaders.map((l) => l.name),
       };
       return {
         ...state,
@@ -154,11 +162,13 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
       if (lastRound.type === "semifinal") {
         // Generate 2 Redemption tables from semifinal results
         const tables = generateFinalsRound6(lastRound);
+        const cLeaders = selectRoundLeaders("C");
         const newRound: Round = {
           number: state.rounds.length + 1,
           tables,
           isComplete: false,
           type: "winners-final",
+          availableLeaders: cLeaders.map((l) => l.name),
         };
         return {
           ...state,
@@ -173,11 +183,13 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
         if (!semiRound) return state;
 
         const grandFinalTable = generateGrandFinal(semiRound, lastRound);
+        const cLeaders = selectRoundLeaders("C");
         const newRound: Round = {
           number: state.rounds.length + 1,
           tables: [grandFinalTable],
           isComplete: false,
           type: "grand-final",
+          availableLeaders: cLeaders.map((l) => l.name),
         };
         return {
           ...state,
@@ -195,6 +207,7 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
 
     case "IMPORT_STATE": {
       initializePlayerIds(action.state.players);
+      migrateLeaderNames(action.state);
       return action.state;
     }
 
@@ -236,6 +249,7 @@ function loadState(): TournamentState {
     if (stored) {
       const parsed = JSON.parse(stored) as TournamentState;
       initializePlayerIds(parsed.players);
+      migrateLeaderNames(parsed);
       return parsed;
     }
   } catch {

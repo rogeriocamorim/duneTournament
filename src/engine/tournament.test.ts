@@ -7,6 +7,9 @@ import {
   getFinalStandings,
   applyResults,
   getStandings,
+  getTierForRound,
+  selectRoundLeaders,
+  migrateLeaderNames,
 } from "./tournament";
 
 // ===== TEST HELPERS =====
@@ -680,5 +683,204 @@ describe("end-to-end bracket flow", () => {
     expect(grandFinalTable.playerIds).toContain("16");
     expect(grandFinalTable.playerIds).toContain("1");
     expect(grandFinalTable.playerIds).toContain("2");
+  });
+});
+
+// ===== LEADER TIER SELECTION TESTS =====
+
+describe("getTierForRound", () => {
+  it("returns A for qualifying rounds 1 and 2", () => {
+    expect(getTierForRound(1, false)).toBe("A");
+    expect(getTierForRound(2, false)).toBe("A");
+  });
+
+  it("returns B for qualifying rounds 3 and 4", () => {
+    expect(getTierForRound(3, false)).toBe("B");
+    expect(getTierForRound(4, false)).toBe("B");
+  });
+
+  it("returns C for rounds beyond 4 in qualifying", () => {
+    expect(getTierForRound(5, false)).toBe("C");
+    expect(getTierForRound(6, false)).toBe("C");
+  });
+
+  it("returns C for all top8 rounds regardless of round number", () => {
+    expect(getTierForRound(1, true)).toBe("C");
+    expect(getTierForRound(5, true)).toBe("C");
+    expect(getTierForRound(7, true)).toBe("C");
+  });
+});
+
+describe("selectRoundLeaders", () => {
+  it("returns exactly 7 leaders", () => {
+    const leaders = selectRoundLeaders("A");
+    expect(leaders).toHaveLength(7);
+  });
+
+  it("returns leaders from the correct tier", () => {
+    const leaders = selectRoundLeaders("B");
+    for (const leader of leaders) {
+      expect(leader.tier).toBe("B");
+    }
+  });
+
+  it("returns unique leaders (no duplicates)", () => {
+    const leaders = selectRoundLeaders("A");
+    const ids = leaders.map((l) => l.id);
+    expect(new Set(ids).size).toBe(7);
+  });
+
+  it("selects from the A-tier pool (9 leaders, picks 7)", () => {
+    // Run multiple times to verify randomness doesn't break things
+    for (let i = 0; i < 10; i++) {
+      const leaders = selectRoundLeaders("A");
+      expect(leaders).toHaveLength(7);
+      for (const leader of leaders) {
+        expect(leader.tier).toBe("A");
+      }
+    }
+  });
+
+  it("selects from the B-tier pool (8 leaders, picks 7)", () => {
+    const leaders = selectRoundLeaders("B");
+    expect(leaders).toHaveLength(7);
+    for (const leader of leaders) {
+      expect(leader.tier).toBe("B");
+    }
+  });
+
+  it("selects from the C-tier pool (8 leaders, picks 7)", () => {
+    const leaders = selectRoundLeaders("C");
+    expect(leaders).toHaveLength(7);
+    for (const leader of leaders) {
+      expect(leader.tier).toBe("C");
+    }
+  });
+
+  it("produces different selections across calls (randomness)", () => {
+    // Run 20 times and collect all unique sets; at least 2 should differ
+    const selections = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      const leaders = selectRoundLeaders("A");
+      const key = leaders.map((l) => l.id).sort().join(",");
+      selections.add(key);
+    }
+    // With 9 choose 7 = 36 combinations, 20 tries should yield at least 2 different
+    expect(selections.size).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ===== MIGRATE LEADER NAMES =====
+
+describe("migrateLeaderNames", () => {
+  function makeMinimalState(rounds: Round[]): TournamentState {
+    return {
+      metadata: { version: "1.0.0", tournamentName: "Test", timestamp: "2025-01-01T00:00:00Z" },
+      players: [],
+      rounds,
+      currentRound: rounds.length,
+      phase: "qualifying",
+      settings: { totalQualifyingRounds: 4, topCut: 16, dramaticReveal: false },
+    };
+  }
+
+  it("converts old camelCase leader ids to display names", () => {
+    const table: Table = {
+      id: 1,
+      playerIds: ["p1", "p2", "p3", "p4"],
+      results: [
+        { playerId: "p1", position: 1, vp: 12, leader: "paulAtreides" },
+        { playerId: "p2", position: 2, vp: 10, leader: "glossuRabban" },
+        { playerId: "p3", position: 3, vp: 9, leader: "letoAtreides" },
+        { playerId: "p4", position: 4, vp: 8, leader: "vladimirHarkonnen" },
+      ],
+      isComplete: true,
+    };
+    const round: Round = { number: 1, tables: [table], isComplete: true, type: "qualifying" };
+    const state = makeMinimalState([round]);
+
+    migrateLeaderNames(state);
+
+    expect(state.rounds[0].tables[0].results[0].leader).toBe("Paul Atreides");
+    expect(state.rounds[0].tables[0].results[1].leader).toBe('Glossu "The Beast" Rabban');
+    expect(state.rounds[0].tables[0].results[2].leader).toBe("Duke Leto Atreides");
+    expect(state.rounds[0].tables[0].results[3].leader).toBe("Baron Vladimir Harkonnen");
+  });
+
+  it("leaves current display names unchanged (idempotent)", () => {
+    const table: Table = {
+      id: 1,
+      playerIds: ["p1", "p2"],
+      results: [
+        { playerId: "p1", position: 1, vp: 10, leader: "Tessia Vernius" },
+        { playerId: "p2", position: 2, vp: 8, leader: "Count Hasimir Fenring" },
+      ],
+      isComplete: true,
+    };
+    const round: Round = { number: 2, tables: [table], isComplete: true, type: "qualifying" };
+    const state = makeMinimalState([round]);
+
+    migrateLeaderNames(state);
+
+    expect(state.rounds[0].tables[0].results[0].leader).toBe("Tessia Vernius");
+    expect(state.rounds[0].tables[0].results[1].leader).toBe("Count Hasimir Fenring");
+  });
+
+  it("handles empty or missing leader fields gracefully", () => {
+    const table: Table = {
+      id: 1,
+      playerIds: ["p1", "p2"],
+      results: [
+        { playerId: "p1", position: 1, vp: 10, leader: "" },
+        { playerId: "p2", position: 2, vp: 8 } as never,
+      ],
+      isComplete: true,
+    };
+    const round: Round = { number: 1, tables: [table], isComplete: true, type: "qualifying" };
+    const state = makeMinimalState([round]);
+
+    // Should not throw
+    migrateLeaderNames(state);
+
+    expect(state.rounds[0].tables[0].results[0].leader).toBe("");
+  });
+
+  it("handles mixed old and new leader names in the same round", () => {
+    const table: Table = {
+      id: 1,
+      playerIds: ["p1", "p2", "p3", "p4"],
+      results: [
+        { playerId: "p1", position: 1, vp: 12, leader: "tessiaVernius" },
+        { playerId: "p2", position: 2, vp: 10, leader: "Kota Odax of Ix" },
+        { playerId: "p3", position: 3, vp: 9, leader: "armandEcaz" },
+        { playerId: "p4", position: 4, vp: 8, leader: "Piter De Vries (Community)" },
+      ],
+      isComplete: true,
+    };
+    const round: Round = { number: 1, tables: [table], isComplete: true, type: "qualifying" };
+    const state = makeMinimalState([round]);
+
+    migrateLeaderNames(state);
+
+    expect(state.rounds[0].tables[0].results[0].leader).toBe("Tessia Vernius");
+    expect(state.rounds[0].tables[0].results[1].leader).toBe("Kota Odax of Ix");
+    expect(state.rounds[0].tables[0].results[2].leader).toBe("Archduke Armand Ecaz");
+    expect(state.rounds[0].tables[0].results[3].leader).toBe("Piter De Vries (Community)");
+  });
+
+  it("does not update timestamp when no migration is needed", () => {
+    const table: Table = {
+      id: 1,
+      playerIds: ["p1"],
+      results: [{ playerId: "p1", position: 1, vp: 10, leader: "Tessia Vernius" }],
+      isComplete: true,
+    };
+    const round: Round = { number: 1, tables: [table], isComplete: true, type: "qualifying" };
+    const state = makeMinimalState([round]);
+    const originalTimestamp = state.metadata.timestamp;
+
+    migrateLeaderNames(state);
+
+    expect(state.metadata.timestamp).toBe(originalTimestamp);
   });
 });

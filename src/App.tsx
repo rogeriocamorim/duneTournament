@@ -51,6 +51,19 @@ function App() {
   const [transitioning, setTransitioning] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
+  // ===== ESCAPE KEY HANDLER =====
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (showShareModal) setShowShareModal(false);
+        else if (showNavigator) setShowNavigator(false);
+        else if (showResetConfirm) setShowResetConfirm(false);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showShareModal, showNavigator, showResetConfirm]);
+
   // Wrap phase transitions with sandstorm
   const transitionTo = useCallback((action: () => void) => {
     setTransitioning(true);

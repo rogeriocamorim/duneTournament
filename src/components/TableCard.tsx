@@ -11,6 +11,7 @@ interface TableCardProps {
   onSubmitResults: (roundIndex: number, tableId: number, results: TableResult[]) => void;
   animationDelay?: number;
   allowEdit?: boolean;
+  availableLeaders?: string[];
 }
 
 const tableVariants = {
@@ -35,6 +36,7 @@ export function TableCard({
   onSubmitResults,
   animationDelay = 0,
   allowEdit = false,
+  availableLeaders,
 }: TableCardProps) {
   const [editing, setEditing] = useState(!table.isComplete);
   const [results, setResults] = useState<Record<string, { position: number; vp: number; leader: string }>>(
@@ -196,19 +198,32 @@ export function TableCard({
                   className="bg-black/50 border border-spice/30 text-sand text-xs px-1 py-1 rounded-sm w-28 truncate"
                 >
                   <option value="">Leader...</option>
-                  {(["base", "ix", "uprising", "bloodlines"] as const).map((exp) => {
-                    const leaders = LEADER_LIST.filter((l) => l.expansion === exp);
-                    if (leaders.length === 0) return null;
-                    return (
-                      <optgroup key={exp} label={exp.charAt(0).toUpperCase() + exp.slice(1)}>
-                        {leaders.map((l) => (
-                          <option key={l.id} value={l.name}>
-                            {l.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    );
-                  })}
+                  {availableLeaders ? (
+                    // Filtered: only show the 7 leaders available for this round
+                    availableLeaders.map((name) => {
+                      const info = LEADER_LIST.find((l) => l.name === name);
+                      return (
+                        <option key={info?.id ?? name} value={name}>
+                          {name}
+                        </option>
+                      );
+                    })
+                  ) : (
+                    // Unfiltered: show all leaders grouped by expansion
+                    (["base", "ix", "uprising", "bloodlines"] as const).map((exp) => {
+                      const leaders = LEADER_LIST.filter((l) => l.expansion === exp);
+                      if (leaders.length === 0) return null;
+                      return (
+                        <optgroup key={exp} label={exp.charAt(0).toUpperCase() + exp.slice(1)}>
+                          {leaders.map((l) => (
+                            <option key={l.id} value={l.name}>
+                              {l.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      );
+                    })
+                  )}
                 </select>
               ) : (
                 result?.leader && (

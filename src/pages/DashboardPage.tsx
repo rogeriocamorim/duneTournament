@@ -1,10 +1,12 @@
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { useState, useRef, useCallback } from "react";
 import { TableCard } from "../components/TableCard";
 import { DramaticReveal } from "../components/DramaticReveal";
 import { Leaderboard } from "../components/Leaderboard";
 import { LeaderStatsPanel } from "../components/LeaderStatsPanel";
+import { LeaderReveal } from "../components/animations/LeaderReveal";
 import type { TournamentState, TableResult } from "../engine/types";
+import { getTierForRound } from "../engine/tournament";
 import { Trophy, Swords, BarChart3, Crown } from "lucide-react";
 
 interface DashboardPageProps {
@@ -26,6 +28,7 @@ export function DashboardPage({
 }: DashboardPageProps) {
   const [activeTab, setActiveTab] = useState<TabView>("tables");
   const [_showExplosion, setShowExplosion] = useState(false);
+  const [showLeaderReveal, setShowLeaderReveal] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const currentRound = state.rounds[state.rounds.length - 1];
@@ -67,8 +70,12 @@ export function DashboardPage({
     setTimeout(() => {
       onGenerateRound();
       setShowExplosion(false);
+      // Trigger leader reveal after round generation (if dramatic reveal enabled)
+      if (dramaticReveal) {
+        setShowLeaderReveal(true);
+      }
     }, 400);
-  }, [onGenerateRound]);
+  }, [onGenerateRound, dramaticReveal]);
 
   return (
     <div ref={containerRef} className="max-w-5xl mx-auto px-4 py-8 relative">
@@ -203,6 +210,7 @@ export function DashboardPage({
                     onSubmitResults={onSubmitResults}
                     animationDelay={dramaticReveal ? 0 : index}
                     allowEdit={currentRound.isComplete}
+                    availableLeaders={currentRound.availableLeaders}
                   />
                 ))}
               />
@@ -244,6 +252,17 @@ export function DashboardPage({
           <LeaderStatsPanel rounds={state.rounds} />
         </motion.div>
       )}
+
+      {/* Leader Tier Reveal Overlay */}
+      <AnimatePresence>
+        {showLeaderReveal && currentRound?.availableLeaders && (
+          <LeaderReveal
+            leaders={currentRound.availableLeaders}
+            tier={getTierForRound(currentRound.number, false)}
+            onComplete={() => setShowLeaderReveal(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

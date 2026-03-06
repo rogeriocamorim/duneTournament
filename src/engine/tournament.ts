@@ -1,6 +1,6 @@
 import type { Player, Table, Round, TournamentState } from "./types";
-import type { LeaderStat } from "./types";
-import { getLeaderInfo } from "./types";
+import type { LeaderStat, LeaderTier, LeaderInfo } from "./types";
+import { LEADER_LIST, getLeaderInfo, getLeadersByTier } from "./types";
 
 // ===== PLAYER MANAGEMENT =====
 
@@ -486,12 +486,21 @@ export function getLeaderStats(
   fromRound?: number,
   toRound?: number
 ): LeaderStat[] {
-  const statsMap = new Map<string, { plays: number; wins: number; top2: number; totalVP: number; positionSum: number }>();
+  const statsMap = new Map<string, { plays: number; wins: number; top2: number; totalVP: number; positionSum: number; roundsAvailable: number }>();
 
   for (const round of rounds) {
     if (!round.isComplete) continue;
     if (fromRound !== undefined && round.number < fromRound) continue;
     if (toRound !== undefined && round.number > toRound) continue;
+
+    // Track which leaders were available this round
+    const available = new Set(round.availableLeaders ?? []);
+    for (const name of available) {
+      if (!statsMap.has(name)) {
+        statsMap.set(name, { plays: 0, wins: 0, top2: 0, totalVP: 0, positionSum: 0, roundsAvailable: 0 });
+      }
+      statsMap.get(name)!.roundsAvailable++;
+    }
 
     for (const table of round.tables) {
       for (const result of table.results) {
@@ -499,7 +508,7 @@ export function getLeaderStats(
 
         const leader = result.leader;
         if (!statsMap.has(leader)) {
-          statsMap.set(leader, { plays: 0, wins: 0, top2: 0, totalVP: 0, positionSum: 0 });
+          statsMap.set(leader, { plays: 0, wins: 0, top2: 0, totalVP: 0, positionSum: 0, roundsAvailable: 0 });
         }
 
         const stat = statsMap.get(leader)!;
@@ -523,6 +532,7 @@ export function getLeaderStats(
       top2: stat.top2,
       totalVP: stat.totalVP,
       avgPosition: stat.plays > 0 ? +(stat.positionSum / stat.plays).toFixed(2) : 0,
+      roundsAvailable: stat.roundsAvailable,
       winRate: stat.plays > 0 ? +(stat.wins / stat.plays * 100).toFixed(1) : 0,
     });
   }
@@ -534,6 +544,68 @@ export function getLeaderStats(
   });
 
   return leaderStats;
+}
+
+// ===== LEADER TIER SELECTION =====
+
+/**
+ * Determine which leader tier to use for a given qualifying round number.
+ * Rounds 1-2 → A tier, Rounds 3-4 → B tier, Finals → C tier.
+ */
+export function getTierForRound(roundNumber: number, isTop8: boolean): LeaderTier {
+  if (isTop8) return "C";
+  if (roundNumber <= 2) return "A";
+  if (roundNumber <= 4) return "B";
+  return "C";
+}
+
+/**
+ * Select 7 random leaders from the given tier's pool.
+ * Uses Fisher-Yates shuffle on a copy of the tier's leaders,
+ * then takes the first 7.
+ */
+export function selectRoundLeaders(tier: LeaderTier): LeaderInfo[] {
+  const pool = getLeadersByTier(tier);
+  const shuffled = [...pool];
+  shuffleArray(shuffled);
+  return shuffled.slice(0, 7);
+}
+
+// ===== DATA MIGRATION =====
+
+/** Map from legacy camelCase leader id → current display name */
+const LEADER_ID_TO_NAME = new Map<string, string>(
+  LEADER_LIST.map((l) => [l.id, l.name])
+);
+
+/**
+ * Migrate old leader id slugs (e.g. "paulAtreides") to current display names
+ * (e.g. "Paul Atreides") in all table results. Idempotent — display names that
+ * already match a LEADER_LIST entry are left untouched.
+ */
+export function migrateLeaderNames(state: TournamentState): TournamentState {
+  let changed = false;
+
+  for (const round of state.rounds) {
+    for (const table of round.tables) {
+      for (const result of table.results) {
+        if (!result.leader) continue;
+        // Already a valid display name — skip
+        if (getLeaderInfo(result.leader)) continue;
+        // Try matching by legacy id
+        const displayName = LEADER_ID_TO_NAME.get(result.leader);
+        if (displayName) {
+          result.leader = displayName;
+          changed = true;
+        }
+      }
+    }
+  }
+
+  if (changed) {
+    state.metadata.timestamp = new Date().toISOString();
+  }
+  return state;
 }
 
 // ===== VALIDATION =====

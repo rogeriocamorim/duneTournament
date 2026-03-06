@@ -28,6 +28,7 @@ export interface Round {
   tables: Table[];
   isComplete: boolean;
   type: "qualifying" | "semifinal" | "winners-final" | "losers-final" | "grand-final";
+  availableLeaders?: string[]; // leader names available for this round (7 random from tier)
 }
 
 export interface TournamentState {
@@ -82,45 +83,47 @@ export interface LeaderInfo {
   name: string;
   tier: LeaderTier;
   expansion: "base" | "ix" | "uprising" | "bloodlines";
+  imageSlug: string;
+  isCommunity?: boolean;
 }
 
 export const LEADER_LIST: LeaderInfo[] = [
   // ── Base Game ──
-  { id: "paulAtreides",      name: "Paul Atreides",                  tier: "none", expansion: "base" },
-  { id: "letoAtreides",      name: "Duke Leto Atreides",             tier: "B",    expansion: "base" },
-  { id: "memnonThorvald",    name: "Earl Memnon Thorvald",           tier: "none", expansion: "base" },
-  { id: "glossuRabban",      name: 'Glossu "The Beast" Rabban',      tier: "A",    expansion: "base" },
-  { id: "vladimirHarkonnen", name: "Baron Vladimir Harkonnen",       tier: "B",    expansion: "base" },
-  { id: "helenaRichese",     name: "Helena Richese",                 tier: "none", expansion: "base" },
-  { id: "arianaThorvald",    name: "Countess Ariana Thorvald",       tier: "none", expansion: "base" },
-  { id: "ilbanRichese",      name: "Count Ilban Richese",            tier: "none", expansion: "base" },
-  { id: "armandEcaz",        name: "Archduke Armand Ecaz",           tier: "B",    expansion: "base" },
+  { id: "paulAtreides",      name: "Paul Atreides",                  tier: "none", expansion: "base",       imageSlug: "dune-imperium-leader-paul-atreides" },
+  { id: "letoAtreides",      name: "Duke Leto Atreides",             tier: "C",    expansion: "base",       imageSlug: "dune-imperium-leader-dune-leto-atreides" },
+  { id: "memnonThorvald",    name: "Earl Memnon Thorvald",           tier: "none", expansion: "base",       imageSlug: "dune-imperium-leader-earl-memnon-thorvald" },
+  { id: "glossuRabban",      name: 'Glossu "The Beast" Rabban',      tier: "A",    expansion: "base",       imageSlug: "dune-imperium-leader-glossu-the-beast-rabban" },
+  { id: "vladimirHarkonnen", name: "Baron Vladimir Harkonnen",       tier: "C",    expansion: "base",       imageSlug: "dune-imperium-leader-baron-vladimir-harkonnen" },
+  { id: "helenaRichese",     name: "Helena Richese",                 tier: "none", expansion: "base",       imageSlug: "dune-imperium-leader-helena-richese" },
+  { id: "arianaThorvald",    name: "Countess Ariana Thorvald",       tier: "none", expansion: "base",       imageSlug: "dune-imperium-leader-countess-ariana-thorvald" },
+  { id: "ilbanRichese",      name: "Count Ilban Richese",            tier: "none", expansion: "base",       imageSlug: "dune-imperium-leader-count-ilban-richese" },
+  { id: "armandEcaz",        name: "Archduke Armand Ecaz",           tier: "C",    expansion: "base",       imageSlug: "rise-of-ix-leader-archduke-armand-ecaz" },
   // ── Ix Expansion ──
-  { id: "tessiaVernius",     name: "Tessia Vernius",                 tier: "A",    expansion: "ix" },
-  { id: "ilesaEcaz_com",     name: "Ilesa Ecaz (Community)",         tier: "A",    expansion: "ix" },
+  { id: "tessiaVernius",     name: "Tessia Vernius",                 tier: "A",    expansion: "ix",         imageSlug: "rise-of-ix-leader-tessia-vernius" },
+  { id: "ilesaEcaz_com",     name: "Ilesa Ecaz (Community)",         tier: "A",    expansion: "ix",         imageSlug: "rise-of-ix-leader-ilesa-ecaz", isCommunity: true },
   // ── Uprising Expansion ──
-  { id: "stabanTuek",        name: "Staban Tuek",                    tier: "A",    expansion: "uprising" },
-  { id: "amberMetulli",      name: "Lady Amber Metulli",             tier: "B",    expansion: "uprising" },
-  { id: "gurneyHalleck",     name: "Gurney Halleck",                 tier: "B",    expansion: "uprising" },
-  { id: "margotFenring",     name: "Lady Margot Fenring",            tier: "C",    expansion: "uprising" },
-  { id: "irulanCorrino",     name: "Princess Irulan",                tier: "B",    expansion: "uprising" },
-  { id: "jessica",           name: "Lady Jessica",                   tier: "C",    expansion: "uprising" },
-  { id: "feydRauthaHarkonnen", name: "Feyd-Rautha Harkonnen",        tier: "C",    expansion: "uprising" },
-  { id: "shaddamCorrino",    name: "Shaddam IV",                     tier: "C",    expansion: "uprising" },
-  { id: "muadDib",           name: "Muad'Dib",                       tier: "C",    expansion: "uprising" },
-  { id: "yunaMoritani",      name: "Princess Yuna Moritani",         tier: "B",    expansion: "uprising" },
+  { id: "stabanTuek",        name: "Staban Tuek",                    tier: "A",    expansion: "uprising",   imageSlug: "uprising-leader-staban-tuek" },
+  { id: "amberMetulli",      name: "Lady Amber Metulli",             tier: "B",    expansion: "uprising",   imageSlug: "uprising-leader-lady-amber-metulli" },
+  { id: "gurneyHalleck",     name: "Gurney Halleck",                 tier: "B",    expansion: "uprising",   imageSlug: "uprising-leader-gurney-halleck" },
+  { id: "margotFenring",     name: "Lady Margot Fenring",            tier: "C",    expansion: "uprising",   imageSlug: "uprising-leader-lady-margot-fenring" },
+  { id: "irulanCorrino",     name: "Princess Irulan",                tier: "B",    expansion: "uprising",   imageSlug: "uprising-leader-princess-irulan" },
+  { id: "jessica",           name: "Lady Jessica",                   tier: "C",    expansion: "uprising",   imageSlug: "uprising-leader-lady-jessica" },
+  { id: "feydRauthaHarkonnen", name: "Feyd-Rautha Harkonnen",        tier: "C",    expansion: "uprising",   imageSlug: "uprising-leader-feyd-rautha-harkonnen" },
+  { id: "shaddamCorrino",    name: "Shaddam IV",                     tier: "C",    expansion: "uprising",   imageSlug: "uprising-leader-shaddam-corrino-iv" },
+  { id: "muadDib",           name: "Muad'Dib",                       tier: "B",    expansion: "uprising",   imageSlug: "uprising-leader-muad-dib" },
+  { id: "yunaMoritani",      name: "Princess Yuna Moritani",         tier: "C",    expansion: "uprising",   imageSlug: "rise-of-ix-leader-princess-yuna-moritani" },
   // ── Bloodlines Expansion ──
-  { id: "bl_Chani",          name: "Chani",                          tier: "C",    expansion: "bloodlines" },
-  { id: "bl_Duncan",         name: "Duncan Idaho",                   tier: "C",    expansion: "bloodlines" },
-  { id: "bl_Esmar",          name: "Esmar Tuek",                     tier: "A",    expansion: "bloodlines" },
-  { id: "bl_Hasimir",        name: "Count Hasimir Fenring",          tier: "A",    expansion: "bloodlines" },
-  { id: "bl_Kota",           name: "Kota Odax of Ix",                tier: "A",    expansion: "bloodlines" },
-  { id: "bl_Liet",           name: "Liet Kynes",                     tier: "none", expansion: "bloodlines" },
-  { id: "liet_com",          name: "Liet Kynes (Community)",         tier: "A",    expansion: "bloodlines" },
-  { id: "bl_Mohiam",         name: "Gaius Helen Mohiam",             tier: "C",    expansion: "bloodlines" },
-  { id: "bl_Piter",          name: "Piter De Vries",                 tier: "none", expansion: "bloodlines" },
-  { id: "bl_Piter_com",      name: "Piter De Vries (Community)",     tier: "A",    expansion: "bloodlines" },
-  { id: "bl_Yrkoon",         name: "Steersman Y'rkoon",              tier: "C",    expansion: "bloodlines" },
+  { id: "bl_Chani",          name: "Chani",                          tier: "B",    expansion: "bloodlines", imageSlug: "bloodlines-leader-chani" },
+  { id: "bl_Duncan",         name: "Duncan Idaho",                   tier: "B",    expansion: "bloodlines", imageSlug: "bloodlines-leader-duncan-idaho" },
+  { id: "bl_Esmar",          name: "Esmar Tuek",                     tier: "A",    expansion: "bloodlines", imageSlug: "bloodlines-leader-esmar-tuek" },
+  { id: "bl_Hasimir",        name: "Count Hasimir Fenring",          tier: "A",    expansion: "bloodlines", imageSlug: "bloodlines-leader-count-hasimir-fenring" },
+  { id: "bl_Kota",           name: "Kota Odax of Ix",                tier: "A",    expansion: "bloodlines", imageSlug: "bloodlines-leader-kota-odax-of-ix" },
+  { id: "bl_Liet",           name: "Liet Kynes",                     tier: "none", expansion: "bloodlines", imageSlug: "bloodlines-leader-liet-kynes" },
+  { id: "liet_com",          name: "Liet Kynes (Community)",         tier: "A",    expansion: "bloodlines", imageSlug: "bloodlines-leader-liet-kynes", isCommunity: true },
+  { id: "bl_Mohiam",         name: "Gaius Helen Mohiam",             tier: "B",    expansion: "bloodlines", imageSlug: "bloodlines-leader-gaius-helen-mohiam" },
+  { id: "bl_Piter",          name: "Piter De Vries",                 tier: "none", expansion: "bloodlines", imageSlug: "bloodlines-leader-piter-de-vries" },
+  { id: "bl_Piter_com",      name: "Piter De Vries (Community)",     tier: "A",    expansion: "bloodlines", imageSlug: "bloodlines-leader-piter-de-vries", isCommunity: true },
+  { id: "bl_Yrkoon",         name: "Steersman Y'rkoon",              tier: "B",    expansion: "bloodlines", imageSlug: "bloodlines-leader-steersman-y-rkoon" },
 ];
 
 /** Flat list of leader display names (for dropdowns) */
@@ -136,6 +139,11 @@ export function getLeadersByTier(tier: LeaderTier): LeaderInfo[] {
   return LEADER_LIST.filter((l) => l.tier === tier);
 }
 
+/** Get the local image URL for a leader card */
+export function getLeaderImageUrl(leader: LeaderInfo): string {
+  return `${import.meta.env.BASE_URL}leaders/${leader.imageSlug}.webp`;
+}
+
 // ===== LEADER STATS =====
 
 export interface LeaderStat {
@@ -146,7 +154,8 @@ export interface LeaderStat {
   top2: number; // 1st + 2nd place finishes
   totalVP: number;
   avgPosition: number;
-  winRate: number;
+  roundsAvailable: number; // rounds the leader was in the pool
+  winRate: number; // wins / roundsAvailable
 }
 
 // ===== JSON IMPORT/EXPORT SCHEMA =====

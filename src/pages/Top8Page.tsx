@@ -1,8 +1,9 @@
-import { motion } from "motion/react";
-import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { useState, useCallback } from "react";
 import { TableCard } from "../components/TableCard";
 import { DramaticReveal } from "../components/DramaticReveal";
 import { Leaderboard } from "../components/Leaderboard";
+import { LeaderReveal } from "../components/animations/LeaderReveal";
 import type { TournamentState, TableResult } from "../engine/types";
 import { getTop8, getFinalStandings } from "../engine/tournament";
 import { Trophy, Crown, Swords, ChevronRight, BarChart3 } from "lucide-react";
@@ -27,6 +28,7 @@ export function Top8Page({
   dramaticReveal,
 }: Top8PageProps) {
   const [showStandings, setShowStandings] = useState(false);
+  const [showLeaderReveal, setShowLeaderReveal] = useState(false);
   const top8 = getTop8(state);
 
   const top8Rounds = state.rounds.filter(
@@ -52,6 +54,20 @@ export function Top8Page({
   const canGenerateNext =
     currentRound?.isComplete &&
     (currentRound.type === "semifinal" || currentRound.type === "winners-final");
+
+  const handleStartTop8 = useCallback(() => {
+    onStartTop8();
+    if (dramaticReveal) {
+      setShowLeaderReveal(true);
+    }
+  }, [onStartTop8, dramaticReveal]);
+
+  const handleGenerateTop8Round = useCallback(() => {
+    onGenerateTop8Round();
+    if (dramaticReveal) {
+      setShowLeaderReveal(true);
+    }
+  }, [onGenerateTop8Round, dramaticReveal]);
 
   const isFinished = state.phase === "finished";
 
@@ -148,7 +164,7 @@ export function Top8Page({
 
           {needsGeneration && (
             <div className="text-center mt-6">
-              <button onClick={onStartTop8} className="btn-imperial-filled py-3 px-8">
+              <button onClick={handleStartTop8} className="btn-imperial-filled py-3 px-8">
                 <span className="flex items-center gap-2">
                   <Swords size={18} />
                   Begin Semifinals
@@ -185,6 +201,7 @@ export function Top8Page({
                       onSubmitResults={onSubmitResults}
                       animationDelay={dramaticReveal ? 0 : index}
                       allowEdit={currentRound.isComplete}
+                      availableLeaders={currentRound.availableLeaders}
                     />
                   </div>
                 ))}
@@ -210,6 +227,7 @@ export function Top8Page({
                       onSubmitResults={onSubmitResults}
                       animationDelay={dramaticReveal ? 0 : index + 2}
                       allowEdit={currentRound.isComplete}
+                      availableLeaders={currentRound.availableLeaders}
                     />
                   </div>
                 ))}
@@ -239,6 +257,7 @@ export function Top8Page({
                       onSubmitResults={onSubmitResults}
                       animationDelay={dramaticReveal ? 0 : index}
                       allowEdit={currentRound.isComplete}
+                      availableLeaders={currentRound.availableLeaders}
                     />
                   </div>
                 ))}
@@ -265,6 +284,7 @@ export function Top8Page({
                       onSubmitResults={onSubmitResults}
                       animationDelay={dramaticReveal ? 0 : index}
                       allowEdit={currentRound.isComplete}
+                      availableLeaders={currentRound.availableLeaders}
                     />
                   </div>
                 ))}
@@ -282,7 +302,7 @@ export function Top8Page({
           className="text-center mb-8"
         >
           <button
-            onClick={onGenerateTop8Round}
+            onClick={handleGenerateTop8Round}
             className="btn-imperial-filled py-3 px-8 flex items-center gap-2 mx-auto"
           >
             <ChevronRight size={18} />
@@ -328,6 +348,17 @@ export function Top8Page({
           )}
         </div>
       )}
+
+      {/* Leader Tier Reveal Overlay */}
+      <AnimatePresence>
+        {showLeaderReveal && currentRound?.availableLeaders && (
+          <LeaderReveal
+            leaders={currentRound.availableLeaders}
+            tier="C"
+            onComplete={() => setShowLeaderReveal(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
