@@ -44,8 +44,8 @@ function makeState(players: Player[]): TournamentState {
     players,
     rounds: [],
     phase: "top8",
-    currentRound: 5,
-    settings: { totalQualifyingRounds: 4, topCut: 16, dramaticReveal: false },
+    currentRound: 6,
+    settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false },
   };
 }
 
@@ -167,7 +167,7 @@ describe("generateFinalsRound6", () => {
       { playerId: "16", position: 4, vp: 1 },
     ]);
 
-    semiRound = makeRound(5, "semifinal", [eliteA, eliteB, challC, challD]);
+    semiRound = makeRound(6, "semifinal", [eliteA, eliteB, challC, challD]);
   });
 
   it("produces exactly 2 redemption tables", () => {
@@ -289,7 +289,7 @@ describe("generateGrandFinal", () => {
       { playerId: "15", position: 3, vp: 4 },
       { playerId: "16", position: 4, vp: 1 },
     ]);
-    semiRound = makeRound(5, "semifinal", [eliteA, eliteB, challC, challD]);
+    semiRound = makeRound(6, "semifinal", [eliteA, eliteB, challC, challD]);
 
     // Redemption round (R6)
     // Redemption 1: players 4, 5, 8, 9 — player 9 wins (Challenger redemption!)
@@ -306,7 +306,7 @@ describe("generateGrandFinal", () => {
       { playerId: "7", position: 3, vp: 4 },
       { playerId: "13", position: 4, vp: 1 },
     ]);
-    redemptionRound = makeRound(6, "winners-final", [redemption1, redemption2]);
+    redemptionRound = makeRound(7, "winners-final", [redemption1, redemption2]);
   });
 
   it("produces exactly 1 table with 4 players", () => {
@@ -392,7 +392,7 @@ describe("getFinalStandings", () => {
       { playerId: "15", position: 3, vp: 4 },
       { playerId: "16", position: 4, vp: 1 },
     ]);
-    const semiRound = makeRound(5, "semifinal", [eliteA, eliteB, challC, challD]);
+    const semiRound = makeRound(6, "semifinal", [eliteA, eliteB, challC, challD]);
 
     // Apply R5 scoring
     state.rounds.push(semiRound);
@@ -411,7 +411,7 @@ describe("getFinalStandings", () => {
       { playerId: "7", position: 3, vp: 4 },
       { playerId: "13", position: 4, vp: 1 },
     ]);
-    const redemptionRound = makeRound(6, "winners-final", [redemption1, redemption2]);
+    const redemptionRound = makeRound(7, "winners-final", [redemption1, redemption2]);
 
     state.rounds.push(redemptionRound);
     state = applyResults(state, 1);
@@ -423,7 +423,7 @@ describe("getFinalStandings", () => {
       { playerId: "2", position: 3, vp: 8 },
       { playerId: "3", position: 4, vp: 5 },
     ]);
-    const grandFinalRound = makeRound(7, "grand-final", [grandFinalTable]);
+    const grandFinalRound = makeRound(8, "grand-final", [grandFinalTable]);
 
     state.rounds.push(grandFinalRound);
     state = applyResults(state, 2);
@@ -576,7 +576,7 @@ describe("end-to-end bracket flow", () => {
     ];
     semiTables[3].isComplete = true;
 
-    const semiRound = makeRound(5, "semifinal", semiTables);
+    const semiRound = makeRound(6, "semifinal", semiTables);
 
     // 2. Generate Redemption
     const redemptionTables = generateFinalsRound6(semiRound);
@@ -603,7 +603,7 @@ describe("end-to-end bracket flow", () => {
     ];
     redemptionTables[1].isComplete = true;
 
-    const redemptionRound = makeRound(6, "winners-final", redemptionTables);
+    const redemptionRound = makeRound(7, "winners-final", redemptionTables);
 
     // 3. Generate Grand Final
     const grandFinalTable = generateGrandFinal(semiRound, redemptionRound);
@@ -650,7 +650,7 @@ describe("end-to-end bracket flow", () => {
     ];
     semiTables[3].isComplete = true;
 
-    const semiRound = makeRound(5, "semifinal", semiTables);
+    const semiRound = makeRound(6, "semifinal", semiTables);
     const redemptionTables = generateFinalsRound6(semiRound);
 
     // Challenger C winner (12) goes to Redemption 1
@@ -675,7 +675,7 @@ describe("end-to-end bracket flow", () => {
     ];
     redemptionTables[1].isComplete = true;
 
-    const redemptionRound = makeRound(6, "winners-final", redemptionTables);
+    const redemptionRound = makeRound(7, "winners-final", redemptionTables);
     const grandFinalTable = generateGrandFinal(semiRound, redemptionRound);
 
     // Seeds 12 and 16 (bottom challengers) made it to Grand Final!
@@ -689,19 +689,17 @@ describe("end-to-end bracket flow", () => {
 // ===== LEADER TIER SELECTION TESTS =====
 
 describe("getTierForRound", () => {
-  it("returns A for qualifying rounds 1 and 2", () => {
+  it("cycles A/B/C for qualifying rounds 1-5", () => {
     expect(getTierForRound(1, false)).toBe("A");
-    expect(getTierForRound(2, false)).toBe("A");
+    expect(getTierForRound(2, false)).toBe("B");
+    expect(getTierForRound(3, false)).toBe("C");
+    expect(getTierForRound(4, false)).toBe("A");
+    expect(getTierForRound(5, false)).toBe("B");
   });
 
-  it("returns B for qualifying rounds 3 and 4", () => {
-    expect(getTierForRound(3, false)).toBe("B");
-    expect(getTierForRound(4, false)).toBe("B");
-  });
-
-  it("returns C for rounds beyond 4 in qualifying", () => {
-    expect(getTierForRound(5, false)).toBe("C");
+  it("continues cycling beyond 5 qualifying rounds", () => {
     expect(getTierForRound(6, false)).toBe("C");
+    expect(getTierForRound(7, false)).toBe("A");
   });
 
   it("returns C for all top8 rounds regardless of round number", () => {
@@ -780,7 +778,7 @@ describe("migrateLeaderNames", () => {
       rounds,
       currentRound: rounds.length,
       phase: "qualifying",
-      settings: { totalQualifyingRounds: 4, topCut: 16, dramaticReveal: false },
+      settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false },
     };
   }
 

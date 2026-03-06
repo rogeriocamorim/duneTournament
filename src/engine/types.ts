@@ -68,7 +68,7 @@ export const DEFAULT_STATE: TournamentState = {
   phase: "registration",
   currentRound: 0,
   settings: {
-    totalQualifyingRounds: 4,
+    totalQualifyingRounds: 5,
     topCut: 16,
     dramaticReveal: true,
   },

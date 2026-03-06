@@ -139,17 +139,17 @@ function shuffleArray<T>(arr: T[]): void {
 // Top 8 seeds (Elite) get 2 chances to reach the Grand Final.
 // Bottom 8 seeds (Challenger) get 1 chance.
 //
-// Round 5 — Semifinals:
+// Round 6 — Semifinals:
 //   Elite Table A:      Seeds 1, 4, 5, 8   (alternating high/low)
 //   Elite Table B:      Seeds 2, 3, 6, 7   (alternating high/low)
 //   Challenger Table C: Seeds 9, 10, 11, 12
 //   Challenger Table D: Seeds 13, 14, 15, 16
 //
-// Round 6 — Redemption Round:
+// Round 7 — Redemption Round:
 //   Redemption 1 ("Trial of Gom Jabbar"): 2nd/3rd/4th from Elite A + 1st from Challenger C
 //   Redemption 2 ("Water of Life"):       2nd/3rd/4th from Elite B + 1st from Challenger D
 //
-// Round 7 — Grand Final:
+// Round 8 — Grand Final:
 //   1st from Elite A + 1st from Elite B + Winner Redemption 1 + Winner Redemption 2
 
 /**
@@ -160,7 +160,7 @@ export function getTopCut(state: TournamentState): Player[] {
 }
 
 /**
- * Generate semifinal tables for Round 5 (16 players → 4 tables of 4):
+ * Generate semifinal tables for Round 6 (16 players → 4 tables of 4):
  *   Elite Table A:      Seeds 1, 4, 5, 8
  *   Elite Table B:      Seeds 2, 3, 6, 7
  *   Challenger Table C: Seeds 9, 10, 11, 12
@@ -203,7 +203,7 @@ export function generateSemifinals(state: TournamentState): Table[] {
 }
 
 /**
- * Generate Round 6 Redemption tables from semifinal results (8 players → 2 tables of 4):
+ * Generate Round 7 Redemption tables from semifinal results (8 players → 2 tables of 4):
  *
  *   Redemption 1 ("Trial of Gom Jabbar"):
  *     2nd, 3rd, 4th from Elite A  +  1st from Challenger C
@@ -211,7 +211,7 @@ export function generateSemifinals(state: TournamentState): Table[] {
  *   Redemption 2 ("Water of Life"):
  *     2nd, 3rd, 4th from Elite B  +  1st from Challenger D
  *
- * Challenger 2nd-4th from C and D are ELIMINATED after Round 5.
+ * Challenger 2nd-4th from C and D are ELIMINATED after Round 6.
  * Elite 1st from A and B advance directly to Grand Final.
  */
 export function generateFinalsRound6(semiRound: Round): Table[] {
@@ -550,13 +550,12 @@ export function getLeaderStats(
 
 /**
  * Determine which leader tier to use for a given qualifying round number.
- * Rounds 1-2 → A tier, Rounds 3-4 → B tier, Finals → C tier.
+ * Qualifying rounds cycle: 1→A, 2→B, 3→C, 4→A, 5→B. Finals → C tier.
  */
 export function getTierForRound(roundNumber: number, isTop8: boolean): LeaderTier {
   if (isTop8) return "C";
-  if (roundNumber <= 2) return "A";
-  if (roundNumber <= 4) return "B";
-  return "C";
+  const TIER_CYCLE: LeaderTier[] = ["A", "B", "C"];
+  return TIER_CYCLE[(roundNumber - 1) % TIER_CYCLE.length];
 }
 
 /**
