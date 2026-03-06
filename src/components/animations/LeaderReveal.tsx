@@ -11,6 +11,8 @@ interface LeaderRevealProps {
   tier: LeaderTier;
   /** Called when the reveal is dismissed */
   onComplete: () => void;
+  /** Skip intro/individual reveals and jump straight to the grid */
+  skipToGrid?: boolean;
 }
 
 const TIER_CONFIG: Record<string, { label: string; color: string; glow: string; border: string }> = {
@@ -19,8 +21,8 @@ const TIER_CONFIG: Record<string, { label: string; color: string; glow: string; 
   C: { label: "C Tier", color: "#CD7F32", glow: "rgba(205, 127, 50, 0.4)", border: "rgba(205, 127, 50, 0.6)" },
 };
 
-export function LeaderReveal({ leaders, tier, onComplete }: LeaderRevealProps) {
-  const [currentIndex, setCurrentIndex] = useState(-1); // -1 = intro, 0..6 = individual, 7+ = grid
+export function LeaderReveal({ leaders, tier, onComplete, skipToGrid: skipToGridProp }: LeaderRevealProps) {
+  const [currentIndex, setCurrentIndex] = useState(skipToGridProp ? leaders.length : -1); // -1 = intro, 0..6 = individual, 7+ = grid
   const [isAnimating, setIsAnimating] = useState(false);
 
   const config = TIER_CONFIG[tier] ?? TIER_CONFIG.A;

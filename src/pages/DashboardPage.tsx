@@ -1,13 +1,14 @@
 import { motion, AnimatePresence } from "motion/react";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { TableCard } from "../components/TableCard";
 import { DramaticReveal } from "../components/DramaticReveal";
 import { Leaderboard } from "../components/Leaderboard";
 import { LeaderStatsPanel } from "../components/LeaderStatsPanel";
 import { LeaderReveal } from "../components/animations/LeaderReveal";
 import type { TournamentState, TableResult } from "../engine/types";
+import { getLeaderInfo, getLeaderImageUrl } from "../engine/types";
 import { getTierForRound } from "../engine/tournament";
-import { Trophy, Swords, BarChart3, Crown } from "lucide-react";
+import { Trophy, Swords, BarChart3, Crown, Eye } from "lucide-react";
 
 interface DashboardPageProps {
   state: TournamentState;
@@ -29,7 +30,11 @@ export function DashboardPage({
   const [activeTab, setActiveTab] = useState<TabView>("tables");
   const [_showExplosion, setShowExplosion] = useState(false);
   const [showLeaderReveal, setShowLeaderReveal] = useState(false);
+  const [leaderRevealDone, setLeaderRevealDone] = useState(false);
+  const [manualLeaderReveal, setManualLeaderReveal] = useState(false);
+  const [tablesRevealed, setTablesRevealed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastRevealedRound = useRef<number>(0);
 
   const currentRound = state.rounds[state.rounds.length - 1];
   const completedQualifying = state.rounds.filter(
@@ -38,6 +43,23 @@ export function DashboardPage({
   const needsNewRound = !currentRound || currentRound.isComplete;
   const qualifyingDone =
     completedQualifying >= state.settings.totalQualifyingRounds;
+
+  // Auto-show leader reveal when a new incomplete round with leaders appears
+  // (covers Round 1 generated at tournament start and page refreshes)
+  useEffect(() => {
+    if (
+      dramaticReveal &&
+      currentRound &&
+      !currentRound.isComplete &&
+      currentRound.availableLeaders &&
+      currentRound.number !== lastRevealedRound.current
+    ) {
+      lastRevealedRound.current = currentRound.number;
+      setShowLeaderReveal(true);
+      setLeaderRevealDone(false);
+      setTablesRevealed(false);
+    }
+  }, [dramaticReveal, currentRound]);
 
   const handleGenerateRound = useCallback(() => {
     // Trigger explosion
@@ -70,12 +92,8 @@ export function DashboardPage({
     setTimeout(() => {
       onGenerateRound();
       setShowExplosion(false);
-      // Trigger leader reveal after round generation (if dramatic reveal enabled)
-      if (dramaticReveal) {
-        setShowLeaderReveal(true);
-      }
     }, 400);
-  }, [onGenerateRound, dramaticReveal]);
+  }, [onGenerateRound]);
 
   return (
     <div ref={containerRef} className="max-w-5xl mx-auto px-4 py-8 relative">
@@ -92,7 +110,7 @@ export function DashboardPage({
           <span>{state.players.length} Players</span>
           <span className="text-spice">|</span>
           <span>
-            Round {completedQualifying} / {state.settings.totalQualifyingRounds}
+            Round {currentRound?.number ?? 0} / {state.settings.totalQualifyingRounds}
           </span>
           <span className="text-spice">|</span>
           <span className="text-spice">{state.phase}</span>
@@ -135,6 +153,23 @@ export function DashboardPage({
           Leaders
         </button>
       </div>
+
+      {/* Round Leaders button */}
+      {currentRound?.availableLeaders && (
+        <div className="flex justify-center mb-6">
+          <button
+            onClick={() => {
+              setManualLeaderReveal(true);
+              setShowLeaderReveal(true);
+              setLeaderRevealDone(false);
+            }}
+            className="flex items-center gap-2 px-4 py-1.5 text-xs uppercase tracking-widest rounded-sm transition-all text-sand-dark hover:text-spice border border-white/10 hover:border-spice/40"
+          >
+            <Eye size={14} />
+            Round {currentRound.number} Leaders
+          </button>
+        </div>
+      )}
 
       {/* Content */}
       {activeTab === "tables" && (
@@ -199,8 +234,9 @@ export function DashboardPage({
               </h2>
               <DramaticReveal
                 roundKey={`qualifying-r${currentRound.number}`}
-                enabled={dramaticReveal && !currentRound.isComplete}
+                enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
                 labels={currentRound.tables.map((t) => `Table #${t.id}`)}
+                onAllRevealed={() => setTablesRevealed(true)}
                 items={currentRound.tables.map((table, index) => (
                   <TableCard
                     key={`r${currentRound.number}-t${table.id}`}
@@ -214,6 +250,50 @@ export function DashboardPage({
                   />
                 ))}
               />
+
+              {/* Available Leaders for this round */}
+              {currentRound.availableLeaders && tablesRevealed && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="mt-8"
+                >
+                  <h3 className="text-display text-xs text-sand-dark text-center mb-4 uppercase tracking-[0.2em]">
+                    Round {currentRound.number} Available Leaders
+                  </h3>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-3 justify-items-center">
+                    {currentRound.availableLeaders.map((name) => {
+                      const info = getLeaderInfo(name);
+                      if (!info) return null;
+                      return (
+                        <div key={info.id} className="flex flex-col items-center">
+                          <div
+                            className="relative rounded-md overflow-hidden border border-spice/30"
+                            style={{
+                              boxShadow: "0 0 12px rgba(197, 160, 89, 0.15)",
+                            }}
+                          >
+                            <img
+                              src={getLeaderImageUrl(info)}
+                              alt={info.name}
+                              className="w-24 md:w-32 h-auto block"
+                            />
+                            {info.isCommunity && (
+                              <div className="absolute top-1 right-1 bg-fremen-blue/90 text-obsidian text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded-sm leading-tight">
+                                Community
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-display text-[10px] md:text-xs text-center mt-2 leading-tight max-w-24 md:max-w-32 text-sand">
+                            {info.name}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
             </div>
           )}
 
@@ -259,7 +339,12 @@ export function DashboardPage({
           <LeaderReveal
             leaders={currentRound.availableLeaders}
             tier={getTierForRound(currentRound.number, false)}
-            onComplete={() => setShowLeaderReveal(false)}
+            skipToGrid={manualLeaderReveal}
+            onComplete={() => {
+              setShowLeaderReveal(false);
+              setLeaderRevealDone(true);
+              setManualLeaderReveal(false);
+            }}
           />
         )}
       </AnimatePresence>

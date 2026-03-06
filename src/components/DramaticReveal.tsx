@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "motion/react";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { Eye, ChevronRight } from "lucide-react";
 
@@ -14,6 +14,8 @@ interface DramaticRevealProps {
   enabled: boolean;
   /** Grid class for the container (e.g., "grid grid-cols-1 md:grid-cols-2 gap-4") */
   gridClass?: string;
+  /** Called once when all items have been revealed */
+  onAllRevealed?: () => void;
 }
 
 export function DramaticReveal({
@@ -22,15 +24,42 @@ export function DramaticReveal({
   labels,
   enabled,
   gridClass = "grid grid-cols-1 md:grid-cols-2 gap-4",
+  onAllRevealed,
 }: DramaticRevealProps) {
   const [revealedCount, setRevealedCount] = useState(0);
   const [isRevealing, setIsRevealing] = useState(false);
+  const controlsRef = useRef<HTMLDivElement>(null);
 
   // Reset revealed count when the round changes
   useEffect(() => {
     setRevealedCount(0);
     setIsRevealing(false);
   }, [roundKey]);
+
+  // Fire onAllRevealed when all items are revealed
+  const allRevealed = revealedCount >= items.length && items.length > 0;
+  useEffect(() => {
+    if (allRevealed) {
+      onAllRevealed?.();
+    }
+  }, [allRevealed, onAllRevealed]);
+
+  // Fire onAllRevealed immediately when reveal is disabled
+  useEffect(() => {
+    if (!enabled) {
+      onAllRevealed?.();
+    }
+  }, [enabled, onAllRevealed]);
+
+  // Auto-scroll to keep the reveal controls visible after each table reveal
+  useEffect(() => {
+    if (revealedCount > 0 && controlsRef.current) {
+      // Small delay so the newly revealed table has rendered
+      setTimeout(() => {
+        controlsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 150);
+    }
+  }, [revealedCount]);
 
   const revealNext = useCallback(() => {
     setIsRevealing(true);
@@ -50,7 +79,6 @@ export function DramaticReveal({
     return <div className={gridClass}>{items}</div>;
   }
 
-  const allRevealed = revealedCount >= items.length;
   const currentIndex = revealedCount; // 0-based index of the next item to reveal
 
   return (
@@ -79,6 +107,7 @@ export function DramaticReveal({
       {/* Reveal controls */}
       {!allRevealed && (
         <motion.div
+          ref={controlsRef}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col items-center gap-4 mt-8"

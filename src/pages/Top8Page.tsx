@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "motion/react";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { TableCard } from "../components/TableCard";
 import { DramaticReveal } from "../components/DramaticReveal";
 import { Leaderboard } from "../components/Leaderboard";
@@ -29,6 +29,8 @@ export function Top8Page({
 }: Top8PageProps) {
   const [showStandings, setShowStandings] = useState(false);
   const [showLeaderReveal, setShowLeaderReveal] = useState(false);
+  const [leaderRevealDone, setLeaderRevealDone] = useState(false);
+  const lastRevealedRound = useRef<number>(0);
   const top8 = getTop8(state);
 
   const top8Rounds = state.rounds.filter(
@@ -55,19 +57,28 @@ export function Top8Page({
     currentRound?.isComplete &&
     (currentRound.type === "semifinal" || currentRound.type === "winners-final");
 
+  // Auto-show leader reveal when a new incomplete elimination round with leaders appears
+  useEffect(() => {
+    if (
+      dramaticReveal &&
+      lastElimRound &&
+      !lastElimRound.isComplete &&
+      lastElimRound.availableLeaders &&
+      lastElimRound.number !== lastRevealedRound.current
+    ) {
+      lastRevealedRound.current = lastElimRound.number;
+      setShowLeaderReveal(true);
+      setLeaderRevealDone(false);
+    }
+  }, [dramaticReveal, lastElimRound]);
+
   const handleStartTop8 = useCallback(() => {
     onStartTop8();
-    if (dramaticReveal) {
-      setShowLeaderReveal(true);
-    }
-  }, [onStartTop8, dramaticReveal]);
+  }, [onStartTop8]);
 
   const handleGenerateTop8Round = useCallback(() => {
     onGenerateTop8Round();
-    if (dramaticReveal) {
-      setShowLeaderReveal(true);
-    }
-  }, [onGenerateTop8Round, dramaticReveal]);
+  }, [onGenerateTop8Round]);
 
   const isFinished = state.phase === "finished";
 
@@ -187,7 +198,7 @@ export function Top8Page({
               </h2>
               <DramaticReveal
                 roundKey={`elite-r${currentRound.number}`}
-                enabled={dramaticReveal && !currentRound.isComplete}
+                enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
                 labels={ELITE_TABLE_LABELS}
                 items={currentRound.tables.slice(0, 2).map((table, index) => (
                   <div key={`r${currentRound.number}-t${table.id}`}>
@@ -213,7 +224,7 @@ export function Top8Page({
               </h2>
               <DramaticReveal
                 roundKey={`challenger-r${currentRound.number}`}
-                enabled={dramaticReveal && !currentRound.isComplete}
+                enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
                 labels={CHALLENGER_TABLE_LABELS}
                 items={currentRound.tables.slice(2, 4).map((table, index) => (
                   <div key={`r${currentRound.number}-t${table.id}`}>
@@ -243,7 +254,7 @@ export function Top8Page({
               </h2>
               <DramaticReveal
                 roundKey={`redemption-r${currentRound.number}`}
-                enabled={dramaticReveal && !currentRound.isComplete}
+                enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
                 labels={REDEMPTION_LABELS}
                 items={currentRound.tables.map((table, index) => (
                   <div key={`r${currentRound.number}-t${table.id}`}>
@@ -273,7 +284,7 @@ export function Top8Page({
               </h2>
               <DramaticReveal
                 roundKey={`grand-final-r${currentRound.number}`}
-                enabled={dramaticReveal && !currentRound.isComplete}
+                enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
                 labels={["Grand Final"]}
                 items={currentRound.tables.map((table, index) => (
                   <div key={`r${currentRound.number}-t${table.id}`}>
@@ -355,7 +366,10 @@ export function Top8Page({
           <LeaderReveal
             leaders={currentRound.availableLeaders}
             tier="C"
-            onComplete={() => setShowLeaderReveal(false)}
+            onComplete={() => {
+              setShowLeaderReveal(false);
+              setLeaderRevealDone(true);
+            }}
           />
         )}
       </AnimatePresence>
