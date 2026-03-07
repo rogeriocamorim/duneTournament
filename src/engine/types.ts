@@ -47,6 +47,7 @@ export interface TournamentState {
     totalQualifyingRounds: number;
     topCut: number;
     dramaticReveal: boolean;
+    testMode: boolean;
   };
 }
 
@@ -71,6 +72,7 @@ export const DEFAULT_STATE: TournamentState = {
     totalQualifyingRounds: 5,
     topCut: 16,
     dramaticReveal: true,
+    testMode: false,
   },
 };
 

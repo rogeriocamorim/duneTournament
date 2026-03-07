@@ -8,7 +8,8 @@ import { LeaderReveal } from "../components/animations/LeaderReveal";
 import type { TournamentState, TableResult } from "../engine/types";
 import { getLeaderInfo, getLeaderImageUrl } from "../engine/types";
 import { getTierForRound } from "../engine/tournament";
-import { Trophy, Swords, BarChart3, Crown, Eye } from "lucide-react";
+import { generateRandomTableResults } from "../engine/testUtils";
+import { Trophy, Swords, BarChart3, Crown, Eye, FlaskConical } from "lucide-react";
 
 interface DashboardPageProps {
   state: TournamentState;
@@ -16,6 +17,7 @@ interface DashboardPageProps {
   onSubmitResults: (roundIndex: number, tableId: number, results: TableResult[]) => void;
   onStartTop8: () => void;
   dramaticReveal: boolean;
+  testMode: boolean;
 }
 
 type TabView = "tables" | "standings" | "leaders";
@@ -26,6 +28,7 @@ export function DashboardPage({
   onSubmitResults,
   onStartTop8,
   dramaticReveal,
+  testMode,
 }: DashboardPageProps) {
   const [activeTab, setActiveTab] = useState<TabView>("tables");
   const [_showExplosion, setShowExplosion] = useState(false);
@@ -60,6 +63,17 @@ export function DashboardPage({
       setTablesRevealed(false);
     }
   }, [dramaticReveal, currentRound]);
+
+  const handleAutoFillResults = useCallback(() => {
+    if (!currentRound) return;
+    const roundIndex = state.rounds.length - 1;
+    for (const table of currentRound.tables) {
+      if (!table.isComplete) {
+        const results = generateRandomTableResults(table, currentRound.availableLeaders);
+        onSubmitResults(roundIndex, table.id, results);
+      }
+    }
+  }, [currentRound, state.rounds.length, onSubmitResults]);
 
   const handleGenerateRound = useCallback(() => {
     // Trigger explosion
@@ -232,6 +246,17 @@ export function DashboardPage({
                   ? "Grand Final"
                   : currentRound.type}
               </h2>
+              {testMode && !currentRound.isComplete && (
+                <div className="flex justify-center mb-4">
+                  <button
+                    onClick={handleAutoFillResults}
+                    className="flex items-center gap-2 px-4 py-1.5 text-xs uppercase tracking-widest border border-fremen-blue/40 text-fremen-blue hover:bg-fremen-blue/10 transition-colors rounded-sm"
+                  >
+                    <FlaskConical size={14} />
+                    Auto Fill All Tables
+                  </button>
+                </div>
+              )}
               <DramaticReveal
                 roundKey={`qualifying-r${currentRound.number}`}
                 enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}

@@ -15,6 +15,7 @@ import {
   Sparkles,
   Share2,
   Lock,
+  FlaskConical,
 } from "lucide-react";
 
 
@@ -43,6 +44,7 @@ function App() {
     exportState,
     resetTournament,
     toggleDramaticReveal,
+    toggleTestMode,
     generateShareableLink,
   } = useTournamentState();
 
@@ -173,6 +175,17 @@ function App() {
               <Share2 size={16} className={sharingInProgress ? "animate-pulse" : ""} />
             </button>
             <button
+              onClick={toggleTestMode}
+              className={`p-2 transition-colors ${
+                state.settings.testMode
+                  ? "text-fremen-blue"
+                  : "text-sand-dark hover:text-fremen-blue"
+              }`}
+              title={`Test Mode: ${state.settings.testMode ? "ON" : "OFF"}`}
+            >
+              <FlaskConical size={16} />
+            </button>
+            <button
               onClick={() => setShowResetConfirm(true)}
               className="p-2 text-sand-dark hover:text-blood transition-colors"
               title="Reset Tournament"
@@ -197,6 +210,7 @@ function App() {
               onAddPlayer={addPlayer}
               onRemovePlayer={removePlayer}
               onStart={handleStart}
+              testMode={state.settings.testMode}
             />
           </motion.div>
         )}
@@ -214,6 +228,7 @@ function App() {
               onSubmitResults={submitTableResults}
               onStartTop8={handleStartTop8}
               dramaticReveal={state.settings.dramaticReveal}
+              testMode={state.settings.testMode}
             />
           </motion.div>
         )}
@@ -231,6 +246,7 @@ function App() {
               onGenerateTop8Round={generateTop8Round}
               onStartTop8={startTop8}
               dramaticReveal={state.settings.dramaticReveal}
+              testMode={state.settings.testMode}
             />
           </motion.div>
         )}

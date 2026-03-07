@@ -45,7 +45,7 @@ function makeState(players: Player[]): TournamentState {
     rounds: [],
     phase: "top8",
     currentRound: 6,
-    settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false },
+    settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
   };
 }
 
@@ -778,7 +778,7 @@ describe("migrateLeaderNames", () => {
       rounds,
       currentRound: rounds.length,
       phase: "qualifying",
-      settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false },
+      settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
     };
   }
 

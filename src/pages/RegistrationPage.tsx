@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Users, Play } from "lucide-react";
+import { X, Users, Play, FlaskConical } from "lucide-react";
 import { SandwormRegistration } from "../components/animations/SandwormRegistration";
+import { generateTestPlayerNames } from "../engine/testUtils";
 import type { Player } from "../engine/types";
 
 const INTRO_VIDEO_EMBED_URL =
@@ -12,6 +13,7 @@ interface RegistrationPageProps {
   onAddPlayer: (name: string) => void;
   onRemovePlayer: (id: string) => void;
   onStart: () => void;
+  testMode: boolean;
 }
 
 export function RegistrationPage({
@@ -19,9 +21,18 @@ export function RegistrationPage({
   onAddPlayer,
   onRemovePlayer,
   onStart,
+  testMode,
 }: RegistrationPageProps) {
   const canStart = players.length >= 4;
   const [showVideo, setShowVideo] = useState(false);
+  const [testPlayerCount, setTestPlayerCount] = useState(20);
+
+  const handleAutoFillPlayers = () => {
+    const names = generateTestPlayerNames(testPlayerCount);
+    for (const name of names) {
+      onAddPlayer(name);
+    }
+  };
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
@@ -101,6 +112,32 @@ export function RegistrationPage({
       >
         <SandwormRegistration onAddPlayer={onAddPlayer} />
       </motion.div>
+
+      {/* Test Mode: Auto Fill Players */}
+      {testMode && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.45 }}
+          className="mb-8 flex items-center justify-center gap-3"
+        >
+          <FlaskConical size={14} className="text-fremen-blue" />
+          <input
+            type="number"
+            min={4}
+            max={100}
+            value={testPlayerCount}
+            onChange={(e) => setTestPlayerCount(Math.max(4, parseInt(e.target.value) || 4))}
+            className="bg-black/50 border border-fremen-blue/40 text-score text-sm px-2 py-1 rounded-sm w-16 text-center text-white"
+          />
+          <button
+            onClick={handleAutoFillPlayers}
+            className="px-4 py-1.5 text-xs uppercase tracking-widest border border-fremen-blue/40 text-fremen-blue hover:bg-fremen-blue/10 transition-colors rounded-sm"
+          >
+            Auto Fill Players
+          </button>
+        </motion.div>
+      )}
 
       {/* Player Count */}
       <motion.div

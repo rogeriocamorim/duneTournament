@@ -35,6 +35,7 @@ type Action =
   | { type: "GENERATE_TOP8_ROUND" }
   | { type: "IMPORT_STATE"; state: TournamentState }
   | { type: "TOGGLE_DRAMATIC_REVEAL" }
+  | { type: "TOGGLE_TEST_MODE" }
   | { type: "SET_JSONBIN_INFO"; binId: string; binKey: string }
   | { type: "RESET" };
 
@@ -221,6 +222,16 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
       };
     }
 
+    case "TOGGLE_TEST_MODE": {
+      return {
+        ...state,
+        settings: {
+          ...state.settings,
+          testMode: !state.settings.testMode,
+        },
+      };
+    }
+
     case "SET_JSONBIN_INFO": {
       return {
         ...state,
@@ -315,6 +326,10 @@ export function useTournamentState() {
     dispatch({ type: "TOGGLE_DRAMATIC_REVEAL" });
   }, []);
 
+  const toggleTestMode = useCallback(() => {
+    dispatch({ type: "TOGGLE_TEST_MODE" });
+  }, []);
+
   const standings = state.phase === "finished"
     ? getFinalStandings(state)
     : getStandings(state.players);
@@ -397,6 +412,7 @@ export function useTournamentState() {
     exportState,
     resetTournament,
     toggleDramaticReveal,
+    toggleTestMode,
     generateShareableLink,
   };
 }

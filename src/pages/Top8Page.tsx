@@ -6,7 +6,8 @@ import { Leaderboard } from "../components/Leaderboard";
 import { LeaderReveal } from "../components/animations/LeaderReveal";
 import type { TournamentState, TableResult } from "../engine/types";
 import { getTop8, getFinalStandings } from "../engine/tournament";
-import { Trophy, Crown, Swords, ChevronRight, BarChart3 } from "lucide-react";
+import { generateRandomTableResults } from "../engine/testUtils";
+import { Trophy, Crown, Swords, ChevronRight, BarChart3, FlaskConical } from "lucide-react";
 
 const ELITE_TABLE_LABELS = ["Elite Table A", "Elite Table B"];
 const CHALLENGER_TABLE_LABELS = ["Challenger Table C", "Challenger Table D"];
@@ -18,6 +19,7 @@ interface Top8PageProps {
   onGenerateTop8Round: () => void;
   onStartTop8: () => void;
   dramaticReveal: boolean;
+  testMode: boolean;
 }
 
 export function Top8Page({
@@ -26,6 +28,7 @@ export function Top8Page({
   onGenerateTop8Round,
   onStartTop8,
   dramaticReveal,
+  testMode,
 }: Top8PageProps) {
   const [showStandings, setShowStandings] = useState(false);
   const [showLeaderReveal, setShowLeaderReveal] = useState(false);
@@ -79,6 +82,17 @@ export function Top8Page({
   const handleGenerateTop8Round = useCallback(() => {
     onGenerateTop8Round();
   }, [onGenerateTop8Round]);
+
+  const handleAutoFillResults = useCallback(() => {
+    if (!lastElimRound || lastElimRound.isComplete) return;
+    const roundIndex = state.rounds.indexOf(lastElimRound);
+    for (const table of lastElimRound.tables) {
+      if (!table.isComplete) {
+        const results = generateRandomTableResults(table, lastElimRound.availableLeaders);
+        onSubmitResults(roundIndex, table.id, results);
+      }
+    }
+  }, [lastElimRound, state.rounds, onSubmitResults]);
 
   const isFinished = state.phase === "finished";
 
@@ -189,6 +203,18 @@ export function Top8Page({
       {/* Current Round Tables */}
       {currentRound && (currentRound.type === "semifinal" || currentRound.type === "winners-final" || currentRound.type === "losers-final" || currentRound.type === "grand-final") && (
         <div className="mb-8">
+          {/* Test Mode: Auto Fill Results */}
+          {testMode && !currentRound.isComplete && (
+            <div className="flex justify-center mb-4">
+              <button
+                onClick={handleAutoFillResults}
+                className="flex items-center gap-2 px-4 py-1.5 text-xs uppercase tracking-widest border border-fremen-blue/40 text-fremen-blue hover:bg-fremen-blue/10 transition-colors rounded-sm"
+              >
+                <FlaskConical size={14} />
+                Auto Fill All Tables
+              </button>
+            </div>
+          )}
           {/* ── Semifinals: split into Elite & Challenger sections ── */}
           {currentRound.type === "semifinal" && (
             <>
