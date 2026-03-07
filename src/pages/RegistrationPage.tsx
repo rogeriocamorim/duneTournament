@@ -23,7 +23,7 @@ export function RegistrationPage({
   onStart,
   testMode,
 }: RegistrationPageProps) {
-  const canStart = players.length >= 4;
+  const canStart = players.length >= 4 && players.length % 4 === 0;
   const [showVideo, setShowVideo] = useState(false);
   const [testPlayerCount, setTestPlayerCount] = useState(20);
 
@@ -197,19 +197,20 @@ export function RegistrationPage({
           </button>
           <p className="text-xs text-sand-dark mt-3 uppercase tracking-widest">
             {players.length} players &middot;{" "}
-            {(() => {
-              const n = players.length;
-              const r = n % 4;
-              let t3 = 0;
-              if (r === 1) t3 = 3;
-              else if (r === 2) t3 = 2;
-              else if (r === 3) t3 = 1;
-              const t4 = (n - t3 * 3) / 4;
-              const parts = [];
-              if (t4 > 0) parts.push(`${t4} table${t4 > 1 ? "s" : ""} of 4`);
-              if (t3 > 0) parts.push(`${t3} descent table${t3 > 1 ? "s" : ""} of 3`);
-              return parts.join(" + ");
-            })()}
+            {players.length / 4} table{players.length / 4 > 1 ? "s" : ""} of 4
+          </p>
+        </motion.div>
+      )}
+
+      {/* Hint when player count is not divisible by 4 */}
+      {players.length >= 4 && !canStart && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center"
+        >
+          <p className="text-xs text-spice uppercase tracking-widest">
+            Add {4 - (players.length % 4)} more player{4 - (players.length % 4) > 1 ? "s" : ""} to fill all tables of 4
           </p>
         </motion.div>
       )}

@@ -52,25 +52,23 @@ export function generateSwissPairing(state: TournamentState): Table[] {
   }));
 }
 
+/** Maximum backtracking iterations before falling back to greedy. */
+const MAX_BACKTRACK_ITERATIONS = 100_000;
+
 /**
- * Anti-repeat pairing: tries to arrange players so no two have met before.
- * Uses a greedy approach with backtracking.
+ * Anti-repeat pairing: arranges players so no two have met before.
+ * Uses recursive backtracking with a hard no-rematch constraint.
+ * Falls back to greedy conflict-minimization if no valid assignment exists
+ * (e.g., too few players relative to rounds played).
+ *
+ * Player count MUST be divisible by 4 — all tables seat exactly 4.
  */
 function createValidPods(
   sortedIds: string[],
   playerMap: Map<string, Player>
 ): string[][] {
   const count = sortedIds.length;
-  let remainder = count % 4;
-  let tablesOf3 = 0;
-  if (remainder === 1) tablesOf3 = 3;
-  else if (remainder === 2) tablesOf3 = 2;
-  else if (remainder === 3) tablesOf3 = 1;
-
-  const numTablesOf4 = (count - tablesOf3 * 3) / 4;
-  const tableSizes: number[] = [];
-  for (let i = 0; i < numTablesOf4; i++) tableSizes.push(4);
-  for (let i = 0; i < tablesOf3; i++) tableSizes.push(3);
+  const numTables = count / 4;
 
   // Group players by point brackets for Swiss-style
   const brackets = new Map<number, string[]>();
@@ -85,31 +83,85 @@ function createValidPods(
   const orderedIds: string[] = [];
   const sortedBrackets = [...brackets.entries()].sort((a, b) => b[0] - a[0]);
   for (const [, ids] of sortedBrackets) {
-    // Shuffle within bracket for variety
     shuffleArray(ids);
     orderedIds.push(...ids);
   }
 
-  // Greedy assignment to tables
-  const tables: string[][] = tableSizes.map(() => []);
-  const assigned = new Set<string>();
+  // Build opponent sets for O(1) lookup
+  const opponentSets = new Map<string, Set<string>>();
+  for (const id of orderedIds) {
+    const p = playerMap.get(id)!;
+    opponentSets.set(id, new Set(p.opponents));
+  }
+
+  // ── Backtracking solver ──
+
+  const tables: string[][] = Array.from({ length: numTables }, () => []);
+  let iterations = 0;
+
+  /**
+   * Check if placing `playerId` at `tables[tableIdx]` would cause a rematch.
+   */
+  function hasConflict(playerId: string, tableIdx: number): boolean {
+    const opps = opponentSets.get(playerId)!;
+    for (const otherId of tables[tableIdx]) {
+      if (opps.has(otherId)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Recursively assign players[playerIdx..] to tables.
+   * Returns true if a complete valid assignment is found.
+   */
+  function solve(playerIdx: number): boolean {
+    if (playerIdx === orderedIds.length) return true;
+    if (++iterations > MAX_BACKTRACK_ITERATIONS) return false;
+
+    const playerId = orderedIds[playerIdx];
+
+    for (let t = 0; t < numTables; t++) {
+      if (tables[t].length >= 4) continue;
+      if (hasConflict(playerId, t)) continue;
+
+      // Skip duplicate-shaped tables: if this table is empty and
+      // a previous empty table exists, skip to avoid redundant branches
+      if (tables[t].length === 0) {
+        let hasPriorEmpty = false;
+        for (let p = 0; p < t; p++) {
+          if (tables[p].length === 0) { hasPriorEmpty = true; break; }
+        }
+        if (hasPriorEmpty) continue;
+      }
+
+      tables[t].push(playerId);
+      if (solve(playerIdx + 1)) return true;
+      tables[t].pop();
+    }
+
+    return false;
+  }
+
+  if (solve(0)) {
+    return tables;
+  }
+
+  // ── Fallback: greedy conflict-minimization ──
+  // Used when no conflict-free pairing exists (e.g., 8 players after 3+ rounds)
+
+  const fallbackTables: string[][] = Array.from({ length: numTables }, () => []);
 
   for (const playerId of orderedIds) {
-    if (assigned.has(playerId)) continue;
-
-    const player = playerMap.get(playerId)!;
+    const opps = opponentSets.get(playerId)!;
     let bestTable = -1;
     let bestConflicts = Infinity;
 
-    for (let t = 0; t < tables.length; t++) {
-      if (tables[t].length >= tableSizes[t]) continue;
+    for (let t = 0; t < numTables; t++) {
+      if (fallbackTables[t].length >= 4) continue;
 
-      // Count how many players at this table have already faced this player
       let conflicts = 0;
-      for (const otherId of tables[t]) {
-        if (player.opponents.includes(otherId)) {
-          conflicts++;
-        }
+      for (const otherId of fallbackTables[t]) {
+        if (opps.has(otherId)) conflicts++;
       }
 
       if (conflicts < bestConflicts) {
@@ -119,12 +171,11 @@ function createValidPods(
     }
 
     if (bestTable >= 0) {
-      tables[bestTable].push(playerId);
-      assigned.add(playerId);
+      fallbackTables[bestTable].push(playerId);
     }
   }
 
-  return tables.filter((t) => t.length > 0);
+  return fallbackTables;
 }
 
 function shuffleArray<T>(arr: T[]): void {
@@ -329,6 +380,15 @@ export function revertTableResults(state: TournamentState, roundIndex: number, t
     player.points -= POINTS[result.position] || 0;
     player.totalVP -= result.vp;
     player.efficiency -= result.position;
+
+    // Remove opponents that were added when this table was scored.
+    // Note: this is safe for qualifying rounds where the no-rematch
+    // constraint prevents the same pair meeting at multiple tables.
+    for (const otherId of table.playerIds) {
+      if (otherId !== result.playerId) {
+        player.opponents = player.opponents.filter((id) => id !== otherId);
+      }
+    }
   }
 
   return newState;

@@ -67,7 +67,7 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
     }
 
     case "START_TOURNAMENT": {
-      if (state.players.length < 4) return state;
+      if (state.players.length < 4 || state.players.length % 4 !== 0) return state;
       return {
         ...state,
         phase: "qualifying",

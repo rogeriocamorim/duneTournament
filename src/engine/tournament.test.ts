@@ -10,6 +10,8 @@ import {
   getTierForRound,
   selectRoundLeaders,
   migrateLeaderNames,
+  generateSwissPairing,
+  revertTableResults,
 } from "./tournament";
 
 // ===== TEST HELPERS =====
@@ -880,5 +882,275 @@ describe("migrateLeaderNames", () => {
     migrateLeaderNames(state);
 
     expect(state.metadata.timestamp).toBe(originalTimestamp);
+  });
+});
+
+// ===== SWISS PAIRING — NO-REMATCH TESTS =====
+
+describe("generateSwissPairing", () => {
+  function makeQualifyingState(playerCount: number): TournamentState {
+    const players: Player[] = [];
+    for (let i = 0; i < playerCount; i++) {
+      players.push(makePlayer(String(i + 1), `Player${i + 1}`, 0, 0, 0));
+    }
+    return {
+      metadata: { version: "1.0.0", timestamp: "", tournamentName: "Test" },
+      players,
+      rounds: [],
+      phase: "qualifying",
+      currentRound: 0,
+      settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
+    };
+  }
+
+  /**
+   * Simulate a full round: generate pairing, fill in fake results, apply scoring.
+   * Each table gets positions 1-4 assigned in playerIds order.
+   */
+  function simulateRound(state: TournamentState): TournamentState {
+    const tables = generateSwissPairing(state);
+    const roundNumber = state.rounds.length + 1;
+    const round: Round = {
+      number: roundNumber,
+      tables: tables.map((t) => ({
+        ...t,
+        results: t.playerIds.map((pid, idx) => ({
+          playerId: pid,
+          position: idx + 1,
+          vp: 10 - idx * 2,
+        })),
+        isComplete: true,
+      })),
+      isComplete: true,
+      type: "qualifying",
+    };
+    const newState: TournamentState = {
+      ...state,
+      rounds: [...state.rounds, round],
+      currentRound: roundNumber,
+    };
+    return applyResults(newState, newState.rounds.length - 1);
+  }
+
+  it("produces all tables of exactly 4 players (20 players)", () => {
+    const state = makeQualifyingState(20);
+    const tables = generateSwissPairing(state);
+    expect(tables).toHaveLength(5);
+    for (const table of tables) {
+      expect(table.playerIds).toHaveLength(4);
+    }
+  });
+
+  it("produces all tables of exactly 4 players (16 players)", () => {
+    const state = makeQualifyingState(16);
+    const tables = generateSwissPairing(state);
+    expect(tables).toHaveLength(4);
+    for (const table of tables) {
+      expect(table.playerIds).toHaveLength(4);
+    }
+  });
+
+  it("all players are assigned exactly once", () => {
+    const state = makeQualifyingState(20);
+    const tables = generateSwissPairing(state);
+    const allIds = tables.flatMap((t) => t.playerIds);
+    expect(allIds).toHaveLength(20);
+    expect(new Set(allIds).size).toBe(20);
+  });
+
+  it("no rematches over 5 rounds with 20 players", () => {
+    let state = makeQualifyingState(20);
+    for (let r = 0; r < 5; r++) {
+      state = simulateRound(state);
+    }
+    // Check no player has duplicate opponents
+    for (const player of state.players) {
+      const uniqueOpponents = new Set(player.opponents);
+      expect(uniqueOpponents.size).toBe(player.opponents.length);
+    }
+  });
+
+  it("no rematches over 5 rounds with 16 players", () => {
+    let state = makeQualifyingState(16);
+    for (let r = 0; r < 5; r++) {
+      state = simulateRound(state);
+    }
+    for (const player of state.players) {
+      const uniqueOpponents = new Set(player.opponents);
+      expect(uniqueOpponents.size).toBe(player.opponents.length);
+    }
+  });
+
+  it("no rematches over 5 rounds with 24 players", () => {
+    let state = makeQualifyingState(24);
+    for (let r = 0; r < 5; r++) {
+      state = simulateRound(state);
+    }
+    for (const player of state.players) {
+      const uniqueOpponents = new Set(player.opponents);
+      expect(uniqueOpponents.size).toBe(player.opponents.length);
+    }
+  });
+
+  it("handles 8 players gracefully (rematches inevitable after round 3)", () => {
+    let state = makeQualifyingState(8);
+    // Should not throw for 5 rounds even though rematches are forced
+    for (let r = 0; r < 5; r++) {
+      state = simulateRound(state);
+    }
+    // All players should have been assigned each round
+    expect(state.rounds).toHaveLength(5);
+    for (const round of state.rounds) {
+      const allIds = round.tables.flatMap((t) => t.playerIds);
+      expect(allIds).toHaveLength(8);
+      expect(new Set(allIds).size).toBe(8);
+    }
+  });
+
+  it("tables start with empty results and not complete", () => {
+    const state = makeQualifyingState(20);
+    const tables = generateSwissPairing(state);
+    for (const table of tables) {
+      expect(table.results).toEqual([]);
+      expect(table.isComplete).toBe(false);
+    }
+  });
+
+  it("table ids are sequential starting from 1", () => {
+    const state = makeQualifyingState(20);
+    const tables = generateSwissPairing(state);
+    tables.forEach((t, i) => {
+      expect(t.id).toBe(i + 1);
+    });
+  });
+});
+
+// ===== REVERT TABLE RESULTS — OPPONENT CLEANUP =====
+
+describe("revertTableResults", () => {
+  it("reverts points, VP, and efficiency for a scored table", () => {
+    const players = [
+      makePlayer("1", "A", 0, 0, 0),
+      makePlayer("2", "B", 0, 0, 0),
+      makePlayer("3", "C", 0, 0, 0),
+      makePlayer("4", "D", 0, 0, 0),
+    ];
+    let state: TournamentState = {
+      metadata: { version: "1.0.0", timestamp: "", tournamentName: "Test" },
+      players,
+      rounds: [{
+        number: 1,
+        tables: [makeCompletedTable(1, [
+          { playerId: "1", position: 1, vp: 12 },
+          { playerId: "2", position: 2, vp: 9 },
+          { playerId: "3", position: 3, vp: 6 },
+          { playerId: "4", position: 4, vp: 3 },
+        ])],
+        isComplete: true,
+        type: "qualifying",
+      }],
+      phase: "qualifying",
+      currentRound: 1,
+      settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
+    };
+
+    // Apply scoring
+    state = applyResults(state, 0);
+    expect(state.players.find((p) => p.id === "1")!.points).toBe(5);
+    expect(state.players.find((p) => p.id === "1")!.totalVP).toBe(12);
+
+    // Revert scoring
+    state = revertTableResults(state, 0, 1);
+    expect(state.players.find((p) => p.id === "1")!.points).toBe(0);
+    expect(state.players.find((p) => p.id === "1")!.totalVP).toBe(0);
+    expect(state.players.find((p) => p.id === "1")!.efficiency).toBe(0);
+  });
+
+  it("removes opponents added by the reverted table", () => {
+    const players = [
+      makePlayer("1", "A", 0, 0, 0),
+      makePlayer("2", "B", 0, 0, 0),
+      makePlayer("3", "C", 0, 0, 0),
+      makePlayer("4", "D", 0, 0, 0),
+    ];
+    let state: TournamentState = {
+      metadata: { version: "1.0.0", timestamp: "", tournamentName: "Test" },
+      players,
+      rounds: [{
+        number: 1,
+        tables: [makeCompletedTable(1, [
+          { playerId: "1", position: 1, vp: 12 },
+          { playerId: "2", position: 2, vp: 9 },
+          { playerId: "3", position: 3, vp: 6 },
+          { playerId: "4", position: 4, vp: 3 },
+        ])],
+        isComplete: true,
+        type: "qualifying",
+      }],
+      phase: "qualifying",
+      currentRound: 1,
+      settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
+    };
+
+    // Apply scoring — opponents should be tracked
+    state = applyResults(state, 0);
+    const p1 = state.players.find((p) => p.id === "1")!;
+    expect(p1.opponents).toContain("2");
+    expect(p1.opponents).toContain("3");
+    expect(p1.opponents).toContain("4");
+
+    // Revert — opponents from this table should be removed
+    state = revertTableResults(state, 0, 1);
+    const p1After = state.players.find((p) => p.id === "1")!;
+    expect(p1After.opponents).toHaveLength(0);
+  });
+
+  it("does not affect opponents from other tables", () => {
+    const players = [
+      makePlayer("1", "A", 0, 0, 0),
+      makePlayer("2", "B", 0, 0, 0),
+      makePlayer("3", "C", 0, 0, 0),
+      makePlayer("4", "D", 0, 0, 0),
+      makePlayer("5", "E", 0, 0, 0),
+      makePlayer("6", "F", 0, 0, 0),
+      makePlayer("7", "G", 0, 0, 0),
+      makePlayer("8", "H", 0, 0, 0),
+    ];
+    let state: TournamentState = {
+      metadata: { version: "1.0.0", timestamp: "", tournamentName: "Test" },
+      players,
+      rounds: [{
+        number: 1,
+        tables: [
+          makeCompletedTable(1, [
+            { playerId: "1", position: 1, vp: 12 },
+            { playerId: "2", position: 2, vp: 9 },
+            { playerId: "3", position: 3, vp: 6 },
+            { playerId: "4", position: 4, vp: 3 },
+          ]),
+          makeCompletedTable(2, [
+            { playerId: "5", position: 1, vp: 12 },
+            { playerId: "6", position: 2, vp: 9 },
+            { playerId: "7", position: 3, vp: 6 },
+            { playerId: "8", position: 4, vp: 3 },
+          ]),
+        ],
+        isComplete: true,
+        type: "qualifying",
+      }],
+      phase: "qualifying",
+      currentRound: 1,
+      settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
+    };
+
+    // Apply scoring for all tables
+    state = applyResults(state, 0);
+
+    // Revert only table 1 — table 2 players should keep their opponents
+    state = revertTableResults(state, 0, 1);
+    const p5 = state.players.find((p) => p.id === "5")!;
+    expect(p5.opponents).toContain("6");
+    expect(p5.opponents).toContain("7");
+    expect(p5.opponents).toContain("8");
   });
 });
