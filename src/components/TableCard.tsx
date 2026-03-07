@@ -1,8 +1,8 @@
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { useState, useEffect } from "react";
 import type { Table, TableResult, Player } from "../engine/types";
 import { LEADER_LIST } from "../engine/types";
-import { Pencil } from "lucide-react";
+import { Pencil, AlertTriangle } from "lucide-react";
 
 interface TableCardProps {
   table: Table;
@@ -64,6 +64,8 @@ export function TableCard({
     }
   );
 
+  const [error, setError] = useState<string | null>(null);
+
   // Sync local state when table is completed externally (e.g. auto-fill)
   useEffect(() => {
     if (table.isComplete && editing) {
@@ -81,6 +83,7 @@ export function TableCard({
     .filter(Boolean) as Player[];
 
   const handlePositionChange = (playerId: string, position: number) => {
+    setError(null);
     setResults((prev) => ({
       ...prev,
       [playerId]: { ...prev[playerId], position },
@@ -88,6 +91,7 @@ export function TableCard({
   };
 
   const handleVpChange = (playerId: string, vp: number) => {
+    setError(null);
     setResults((prev) => ({
       ...prev,
       [playerId]: { ...prev[playerId], vp },
@@ -108,11 +112,11 @@ export function TableCard({
     const uniquePositions = new Set(positions);
 
     if (positions.some((p) => p === 0)) {
-      alert("All positions must be set");
+      setError("All positions must be set.");
       return;
     }
     if (uniquePositions.size !== positions.length) {
-      alert("Positions must be unique");
+      setError("Positions must be unique.");
       return;
     }
 
@@ -124,7 +128,7 @@ export function TableCard({
       if (higher.vp < lower.vp) {
         const higherName = tablePlayers.find((p) => p.id === sorted[i][0])?.name ?? `#${higher.position}`;
         const lowerName = tablePlayers.find((p) => p.id === sorted[i + 1][0])?.name ?? `#${lower.position}`;
-        alert(
+        setError(
           `VP conflict: ${higherName} (${higher.position}${positionSuffix(higher.position)} place, ${higher.vp} VP) ` +
           `has fewer VP than ${lowerName} (${lower.position}${positionSuffix(lower.position)} place, ${lower.vp} VP). ` +
           `A higher-placed player must have VP >= lower-placed players.`
@@ -133,6 +137,7 @@ export function TableCard({
       }
     }
 
+    setError(null);
     const tableResults: TableResult[] = entries.map(
       ([playerId, { position, vp, leader }]) => ({
         playerId,
@@ -294,6 +299,24 @@ export function TableCard({
           );
         })}
       </div>
+
+      {/* Validation error */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-3 px-3 py-2 rounded-sm bg-blood/20 border border-blood/50 flex items-start gap-2">
+              <AlertTriangle size={14} className="text-red-400 shrink-0 mt-0.5" />
+              <span className="text-xs text-red-400">{error}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Submit button */}
       {editing && (
