@@ -14,6 +14,7 @@ import {
   getStandings,
   getFinalStandings,
   getTierForRound,
+  randomTier,
   selectRoundLeaders,
   migrateLeaderNames,
 } from "../engine/tournament";
@@ -79,7 +80,7 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
     case "GENERATE_ROUND": {
       const tables = generateSwissPairing(state);
       const roundNumber = state.rounds.length + 1;
-      const tier = getTierForRound(roundNumber, false, state.settings.totalQualifyingRounds);
+      const tier = getTierForRound(roundNumber, false);
       const leaders = selectRoundLeaders(tier);
       const newRound: Round = {
         number: roundNumber,
@@ -209,14 +210,15 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
         if (!semiRound) return state;
 
         const grandFinalTable = generateGrandFinal(semiRound, lastRound);
-        const cLeaders = selectRoundLeaders("C");
+        const grandFinalTier = randomTier();
+        const grandFinalLeaders = selectRoundLeaders(grandFinalTier);
         const newRound: Round = {
           number: state.rounds.length + 1,
           tables: [grandFinalTable],
           isComplete: false,
           type: "grand-final",
-          availableLeaders: cLeaders.map((l) => l.name),
-          leaderTier: "C",
+          availableLeaders: grandFinalLeaders.map((l) => l.name),
+          leaderTier: grandFinalTier,
         };
         return {
           ...state,

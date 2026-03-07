@@ -609,22 +609,22 @@ export function getLeaderStats(
 // ===== LEADER TIER SELECTION =====
 
 /**
- * Determine which leader tier to use for a given qualifying round number.
- * Qualifying rounds cycle: 1→A, 2→B, 3→C, 4→A, ...
- * The final qualifying round is randomized (A, B, or C).
- * Finals (top8) → always C tier.
+ * Determine which leader tier to use for a given round.
+ * Qualifying rounds cycle: 1→A, 2→B, 3→C, 4→A, 5→B.
+ * Top-8 rounds → C tier.
  */
-export function getTierForRound(
-  roundNumber: number,
-  isTop8: boolean,
-  totalQualifyingRounds?: number,
-): LeaderTier {
+export function getTierForRound(roundNumber: number, isTop8: boolean): LeaderTier {
   if (isTop8) return "C";
   const TIER_CYCLE: LeaderTier[] = ["A", "B", "C"];
-  if (totalQualifyingRounds && roundNumber === totalQualifyingRounds) {
-    return TIER_CYCLE[Math.floor(Math.random() * TIER_CYCLE.length)];
-  }
   return TIER_CYCLE[(roundNumber - 1) % TIER_CYCLE.length];
+}
+
+/**
+ * Pick a random leader tier (A, B, or C) for the Grand Final.
+ */
+export function randomTier(): LeaderTier {
+  const TIERS: LeaderTier[] = ["A", "B", "C"];
+  return TIERS[Math.floor(Math.random() * TIERS.length)];
 }
 
 /**
