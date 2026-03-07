@@ -277,7 +277,7 @@ export function Top8Page({
                       roundIndex={state.rounds.indexOf(currentRound)}
                       onSubmitResults={onSubmitResults}
                       animationDelay={dramaticReveal ? 0 : index}
-                      allowEdit={currentRound.isComplete}
+                      allowEdit
                       availableLeaders={currentRound.availableLeaders}
                     />
                   </div>
@@ -303,7 +303,7 @@ export function Top8Page({
                       roundIndex={state.rounds.indexOf(currentRound)}
                       onSubmitResults={onSubmitResults}
                       animationDelay={dramaticReveal ? 0 : index + 2}
-                      allowEdit={currentRound.isComplete}
+                      allowEdit
                       availableLeaders={currentRound.availableLeaders}
                     />
                   </div>
@@ -333,7 +333,7 @@ export function Top8Page({
                       roundIndex={state.rounds.indexOf(currentRound)}
                       onSubmitResults={onSubmitResults}
                       animationDelay={dramaticReveal ? 0 : index}
-                      allowEdit={currentRound.isComplete}
+                      allowEdit
                       availableLeaders={currentRound.availableLeaders}
                     />
                   </div>
@@ -360,7 +360,7 @@ export function Top8Page({
                       roundIndex={state.rounds.indexOf(currentRound)}
                       onSubmitResults={onSubmitResults}
                       animationDelay={dramaticReveal ? 0 : index}
-                      allowEdit={currentRound.isComplete}
+                      allowEdit
                       availableLeaders={currentRound.availableLeaders}
                     />
                   </div>

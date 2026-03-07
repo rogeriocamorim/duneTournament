@@ -275,7 +275,7 @@ export function DashboardPage({
                     roundIndex={state.rounds.length - 1}
                     onSubmitResults={onSubmitResults}
                     animationDelay={dramaticReveal ? 0 : index}
-                    allowEdit={currentRound.isComplete}
+                    allowEdit
                     availableLeaders={currentRound.availableLeaders}
                   />
                 ))}

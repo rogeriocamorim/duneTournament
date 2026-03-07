@@ -137,6 +137,20 @@ export function TableCard({
       }
     }
 
+    // Validate: no duplicate leaders at the same table
+    const leaders = entries.map(([, r]) => r.leader).filter(Boolean);
+    const uniqueLeaders = new Set(leaders);
+    if (uniqueLeaders.size !== leaders.length) {
+      const seen = new Set<string>();
+      for (const [, r] of entries) {
+        if (r.leader && seen.has(r.leader)) {
+          setError(`Duplicate leader: ${r.leader} is selected by multiple players at this table.`);
+          return;
+        }
+        if (r.leader) seen.add(r.leader);
+      }
+    }
+
     setError(null);
     const tableResults: TableResult[] = entries.map(
       ([playerId, { position, vp, leader }]) => ({
