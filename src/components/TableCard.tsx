@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Table, TableResult, Player } from "../engine/types";
 import { LEADER_LIST } from "../engine/types";
 import { Pencil } from "lucide-react";
@@ -63,6 +63,18 @@ export function TableCard({
       return map;
     }
   );
+
+  // Sync local state when table is completed externally (e.g. auto-fill)
+  useEffect(() => {
+    if (table.isComplete && editing) {
+      setEditing(false);
+      const map: Record<string, { position: number; vp: number; leader: string }> = {};
+      for (const r of table.results) {
+        map[r.playerId] = { position: r.position, vp: r.vp, leader: r.leader || "" };
+      }
+      setResults(map);
+    }
+  }, [table.isComplete, table.results, editing]);
 
   const tablePlayers = table.playerIds
     .map((id) => players.find((p) => p.id === id))
