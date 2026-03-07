@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { Player, Round, Table, TournamentState } from "./types";
+import { getLeadersByTier } from "./types";
 import {
   generateSemifinals,
   generateFinalsRound6,
@@ -749,9 +750,10 @@ describe("selectRoundLeaders", () => {
     }
   });
 
-  it("selects from the C-tier pool (8 leaders, picks 7)", () => {
+  it("selects ALL leaders from the C-tier pool (no random draw)", () => {
     const leaders = selectRoundLeaders("C");
-    expect(leaders).toHaveLength(7);
+    const cPool = getLeadersByTier("C");
+    expect(leaders).toHaveLength(cPool.length);
     for (const leader of leaders) {
       expect(leader.tier).toBe("C");
     }

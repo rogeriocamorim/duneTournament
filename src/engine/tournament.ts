@@ -619,14 +619,15 @@ export function getTierForRound(roundNumber: number, isTop8: boolean): LeaderTie
 }
 
 /**
- * Select 7 random leaders from the given tier's pool.
- * Uses Fisher-Yates shuffle on a copy of the tier's leaders,
- * then takes the first 7.
+ * Select leaders for a round from the given tier's pool.
+ * Tier C returns ALL available leaders (used in elimination rounds).
+ * Other tiers draw 7 random leaders via Fisher-Yates shuffle.
  */
 export function selectRoundLeaders(tier: LeaderTier): LeaderInfo[] {
   const pool = getLeadersByTier(tier);
   const shuffled = [...pool];
   shuffleArray(shuffled);
+  if (tier === "C") return shuffled;
   return shuffled.slice(0, 7);
 }
 
