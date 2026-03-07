@@ -206,6 +206,40 @@ export function Top8Page({
         </motion.div>
       )}
 
+      {/* Advance */}
+      {canGenerateNext && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-8"
+        >
+          <button
+            onClick={handleGenerateTop8Round}
+            className="btn-imperial-filled py-3 px-8 flex items-center gap-2 mx-auto"
+          >
+            <ChevronRight size={18} />
+            {currentRound?.type === "semifinal" ? "Generate Redemption Round" : "Generate Grand Final"}
+          </button>
+        </motion.div>
+      )}
+
+      {/* Grand final complete but not yet "finished" */}
+      {currentRound?.type === "grand-final" && currentRound.isComplete && !isFinished && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center mb-8"
+        >
+          <button
+            onClick={onGenerateTop8Round}
+            className="btn-imperial-filled py-3 px-8 flex items-center gap-2 mx-auto"
+          >
+            <Trophy size={18} />
+            Crown the Emperor
+          </button>
+        </motion.div>
+      )}
+
       {/* Current Round Tables */}
       {currentRound && (currentRound.type === "semifinal" || currentRound.type === "winners-final" || currentRound.type === "losers-final" || currentRound.type === "grand-final") && (
         <div className="mb-8">
@@ -335,40 +369,6 @@ export function Top8Page({
             </>
           )}
         </div>
-      )}
-
-      {/* Advance */}
-      {canGenerateNext && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
-        >
-          <button
-            onClick={handleGenerateTop8Round}
-            className="btn-imperial-filled py-3 px-8 flex items-center gap-2 mx-auto"
-          >
-            <ChevronRight size={18} />
-            {currentRound?.type === "semifinal" ? "Generate Redemption Round" : "Generate Grand Final"}
-          </button>
-        </motion.div>
-      )}
-
-      {/* Grand final complete but not yet "finished" */}
-      {currentRound?.type === "grand-final" && currentRound.isComplete && !isFinished && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center mb-8"
-        >
-          <button
-            onClick={onGenerateTop8Round}
-            className="btn-imperial-filled py-3 px-8 flex items-center gap-2 mx-auto"
-          >
-            <Trophy size={18} />
-            Crown the Emperor
-          </button>
-        </motion.div>
       )}
 
       {/* Round History */}
