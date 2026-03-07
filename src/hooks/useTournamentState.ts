@@ -79,7 +79,7 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
     case "GENERATE_ROUND": {
       const tables = generateSwissPairing(state);
       const roundNumber = state.rounds.length + 1;
-      const tier = getTierForRound(roundNumber, false);
+      const tier = getTierForRound(roundNumber, false, state.settings.totalQualifyingRounds);
       const leaders = selectRoundLeaders(tier);
       const newRound: Round = {
         number: roundNumber,
@@ -87,6 +87,7 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
         isComplete: false,
         type: "qualifying",
         availableLeaders: leaders.map((l) => l.name),
+        leaderTier: tier,
       };
       return {
         ...state,
@@ -169,6 +170,7 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
         isComplete: false,
         type: "semifinal",
         availableLeaders: cLeaders.map((l) => l.name),
+        leaderTier: "C",
       };
       return {
         ...state,
@@ -192,6 +194,7 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
           isComplete: false,
           type: "winners-final",
           availableLeaders: cLeaders.map((l) => l.name),
+          leaderTier: "C",
         };
         return {
           ...state,
@@ -213,6 +216,7 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
           isComplete: false,
           type: "grand-final",
           availableLeaders: cLeaders.map((l) => l.name),
+          leaderTier: "C",
         };
         return {
           ...state,

@@ -692,15 +692,34 @@ describe("end-to-end bracket flow", () => {
 // ===== LEADER TIER SELECTION TESTS =====
 
 describe("getTierForRound", () => {
-  it("cycles A/B/C for qualifying rounds 1-5", () => {
+  it("cycles A/B/C for non-final qualifying rounds", () => {
     expect(getTierForRound(1, false)).toBe("A");
     expect(getTierForRound(2, false)).toBe("B");
     expect(getTierForRound(3, false)).toBe("C");
     expect(getTierForRound(4, false)).toBe("A");
-    expect(getTierForRound(5, false)).toBe("B");
   });
 
-  it("continues cycling beyond 5 qualifying rounds", () => {
+  it("final qualifying round is randomly A, B, or C", () => {
+    const tiers = new Set<string>();
+    for (let i = 0; i < 100; i++) {
+      tiers.add(getTierForRound(5, false, 5));
+    }
+    // All results must be valid tiers
+    for (const t of tiers) {
+      expect(["A", "B", "C"]).toContain(t);
+    }
+    // With 100 tries we should see at least 2 different tiers
+    expect(tiers.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it("non-final round ignores totalQualifyingRounds and follows cycle", () => {
+    expect(getTierForRound(1, false, 5)).toBe("A");
+    expect(getTierForRound(2, false, 5)).toBe("B");
+    expect(getTierForRound(3, false, 5)).toBe("C");
+    expect(getTierForRound(4, false, 5)).toBe("A");
+  });
+
+  it("continues cycling beyond 5 qualifying rounds without total", () => {
     expect(getTierForRound(6, false)).toBe("C");
     expect(getTierForRound(7, false)).toBe("A");
   });

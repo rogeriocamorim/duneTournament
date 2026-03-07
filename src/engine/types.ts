@@ -28,7 +28,8 @@ export interface Round {
   tables: Table[];
   isComplete: boolean;
   type: "qualifying" | "semifinal" | "winners-final" | "losers-final" | "grand-final";
-  availableLeaders?: string[]; // leader names available for this round (7 random from tier)
+  availableLeaders?: string[]; // leader names available for this round
+  leaderTier?: LeaderTier;     // tier used for leader selection this round
 }
 
 export interface TournamentState {

@@ -7,7 +7,6 @@ import { LeaderStatsPanel } from "../components/LeaderStatsPanel";
 import { LeaderReveal } from "../components/animations/LeaderReveal";
 import type { TournamentState, TableResult } from "../engine/types";
 import { getLeaderInfo, getLeaderImageUrl } from "../engine/types";
-import { getTierForRound } from "../engine/tournament";
 import { generateRandomTableResults } from "../engine/testUtils";
 import { Trophy, Swords, BarChart3, Crown, Eye, FlaskConical } from "lucide-react";
 
@@ -369,7 +368,7 @@ export function DashboardPage({
         {showLeaderReveal && currentRound?.availableLeaders && (
           <LeaderReveal
             leaders={currentRound.availableLeaders}
-            tier={getTierForRound(currentRound.number, false)}
+            tier={currentRound.leaderTier ?? "A"}
             skipToGrid={manualLeaderReveal}
             onComplete={() => {
               setShowLeaderReveal(false);
