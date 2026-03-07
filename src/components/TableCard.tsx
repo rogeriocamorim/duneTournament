@@ -65,10 +65,14 @@ export function TableCard({
   );
 
   const [error, setError] = useState<string | null>(null);
+  const [wasComplete, setWasComplete] = useState(table.isComplete);
 
-  // Sync local state when table is completed externally (e.g. auto-fill)
+  // Sync local state when table is completed externally (e.g. auto-fill).
+  // Only triggers when table.isComplete transitions from false → true,
+  // NOT when the user clicks the edit pencil on an already-complete table.
   useEffect(() => {
-    if (table.isComplete && editing) {
+    if (table.isComplete && !wasComplete) {
+      setWasComplete(true);
       setEditing(false);
       const map: Record<string, { position: number; vp: number; leader: string }> = {};
       for (const r of table.results) {
@@ -76,7 +80,10 @@ export function TableCard({
       }
       setResults(map);
     }
-  }, [table.isComplete, table.results, editing]);
+    if (!table.isComplete && wasComplete) {
+      setWasComplete(false);
+    }
+  }, [table.isComplete, table.results, wasComplete]);
 
   const tablePlayers = table.playerIds
     .map((id) => players.find((p) => p.id === id))
