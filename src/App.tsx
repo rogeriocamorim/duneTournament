@@ -38,6 +38,7 @@ function App() {
     startTournament,
     generateRound,
     submitTableResults,
+    batchSubmitTableResults,
     startTop8,
     generateTop8Round,
     importState,
@@ -226,6 +227,7 @@ function App() {
               state={state}
               onGenerateRound={generateRound}
               onSubmitResults={submitTableResults}
+              onBatchSubmitResults={batchSubmitTableResults}
               onStartTop8={handleStartTop8}
               dramaticReveal={state.settings.dramaticReveal}
               testMode={state.settings.testMode}
@@ -243,6 +245,7 @@ function App() {
             <Top8Page
               state={state}
               onSubmitResults={submitTableResults}
+              onBatchSubmitResults={batchSubmitTableResults}
               onGenerateTop8Round={generateTop8Round}
               onStartTop8={startTop8}
               dramaticReveal={state.settings.dramaticReveal}

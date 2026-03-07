@@ -14,6 +14,14 @@ interface TableCardProps {
   availableLeaders?: string[];
 }
 
+/** Ordinal suffix for position numbers (1st, 2nd, 3rd, 4th) */
+function positionSuffix(pos: number): string {
+  if (pos === 1) return "st";
+  if (pos === 2) return "nd";
+  if (pos === 3) return "rd";
+  return "th";
+}
+
 const tableVariants = {
   hidden: { scale: 0, rotate: -15, opacity: 0 },
   visible: (i: number) => ({
@@ -83,7 +91,8 @@ export function TableCard({
 
   const handleSubmit = () => {
     // Validate: all positions must be set and unique
-    const positions = Object.values(results).map((r) => r.position);
+    const entries = Object.entries(results);
+    const positions = entries.map(([, r]) => r.position);
     const uniquePositions = new Set(positions);
 
     if (positions.some((p) => p === 0)) {
@@ -95,7 +104,24 @@ export function TableCard({
       return;
     }
 
-    const tableResults: TableResult[] = Object.entries(results).map(
+    // Validate: higher-placed players must have VP >= lower-placed players
+    const sorted = [...entries].sort((a, b) => a[1].position - b[1].position);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const higher = sorted[i][1];
+      const lower = sorted[i + 1][1];
+      if (higher.vp < lower.vp) {
+        const higherName = tablePlayers.find((p) => p.id === sorted[i][0])?.name ?? `#${higher.position}`;
+        const lowerName = tablePlayers.find((p) => p.id === sorted[i + 1][0])?.name ?? `#${lower.position}`;
+        alert(
+          `VP conflict: ${higherName} (${higher.position}${positionSuffix(higher.position)} place, ${higher.vp} VP) ` +
+          `has fewer VP than ${lowerName} (${lower.position}${positionSuffix(lower.position)} place, ${lower.vp} VP). ` +
+          `A higher-placed player must have VP >= lower-placed players.`
+        );
+        return;
+      }
+    }
+
+    const tableResults: TableResult[] = entries.map(
       ([playerId, { position, vp, leader }]) => ({
         playerId,
         position,
@@ -107,8 +133,6 @@ export function TableCard({
     onSubmitResults(roundIndex, table.id, tableResults);
     setEditing(false);
   };
-
-  const isDescentTable = table.playerIds.length === 3;
 
   return (
     <motion.div
@@ -122,9 +146,6 @@ export function TableCard({
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-display text-sm">
           <span className="fremen-glow text-lg mr-2">#{table.id}</span>
-          {isDescentTable && (
-            <span className="text-xs text-blood opacity-70 ml-1">DESCENT</span>
-          )}
         </h3>
         {table.isComplete && !editing && (
           <div className="flex items-center gap-2">

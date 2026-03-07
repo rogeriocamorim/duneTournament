@@ -16,6 +16,7 @@ const REDEMPTION_LABELS = ["Trial of Gom Jabbar", "Water of Life"];
 interface Top8PageProps {
   state: TournamentState;
   onSubmitResults: (roundIndex: number, tableId: number, results: TableResult[]) => void;
+  onBatchSubmitResults: (roundIndex: number, tables: { tableId: number; results: TableResult[] }[]) => void;
   onGenerateTop8Round: () => void;
   onStartTop8: () => void;
   dramaticReveal: boolean;
@@ -25,6 +26,7 @@ interface Top8PageProps {
 export function Top8Page({
   state,
   onSubmitResults,
+  onBatchSubmitResults,
   onGenerateTop8Round,
   onStartTop8,
   dramaticReveal,
@@ -86,13 +88,17 @@ export function Top8Page({
   const handleAutoFillResults = useCallback(() => {
     if (!lastElimRound || lastElimRound.isComplete) return;
     const roundIndex = state.rounds.indexOf(lastElimRound);
+    const batch: { tableId: number; results: TableResult[] }[] = [];
     for (const table of lastElimRound.tables) {
       if (!table.isComplete) {
         const results = generateRandomTableResults(table, lastElimRound.availableLeaders);
-        onSubmitResults(roundIndex, table.id, results);
+        batch.push({ tableId: table.id, results });
       }
     }
-  }, [lastElimRound, state.rounds, onSubmitResults]);
+    if (batch.length > 0) {
+      onBatchSubmitResults(roundIndex, batch);
+    }
+  }, [lastElimRound, state.rounds, onBatchSubmitResults]);
 
   const isFinished = state.phase === "finished";
 

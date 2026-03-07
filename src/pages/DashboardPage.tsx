@@ -15,6 +15,7 @@ interface DashboardPageProps {
   state: TournamentState;
   onGenerateRound: () => void;
   onSubmitResults: (roundIndex: number, tableId: number, results: TableResult[]) => void;
+  onBatchSubmitResults: (roundIndex: number, tables: { tableId: number; results: TableResult[] }[]) => void;
   onStartTop8: () => void;
   dramaticReveal: boolean;
   testMode: boolean;
@@ -26,6 +27,7 @@ export function DashboardPage({
   state,
   onGenerateRound,
   onSubmitResults,
+  onBatchSubmitResults,
   onStartTop8,
   dramaticReveal,
   testMode,
@@ -67,13 +69,17 @@ export function DashboardPage({
   const handleAutoFillResults = useCallback(() => {
     if (!currentRound) return;
     const roundIndex = state.rounds.length - 1;
+    const batch: { tableId: number; results: TableResult[] }[] = [];
     for (const table of currentRound.tables) {
       if (!table.isComplete) {
         const results = generateRandomTableResults(table, currentRound.availableLeaders);
-        onSubmitResults(roundIndex, table.id, results);
+        batch.push({ tableId: table.id, results });
       }
     }
-  }, [currentRound, state.rounds.length, onSubmitResults]);
+    if (batch.length > 0) {
+      onBatchSubmitResults(roundIndex, batch);
+    }
+  }, [currentRound, state.rounds.length, onBatchSubmitResults]);
 
   const handleGenerateRound = useCallback(() => {
     // Trigger explosion

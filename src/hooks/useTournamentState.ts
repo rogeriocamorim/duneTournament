@@ -31,6 +31,7 @@ type Action =
   | { type: "START_TOURNAMENT" }
   | { type: "GENERATE_ROUND" }
   | { type: "SUBMIT_TABLE_RESULTS"; roundIndex: number; tableId: number; results: TableResult[] }
+  | { type: "BATCH_SUBMIT_TABLE_RESULTS"; roundIndex: number; tables: { tableId: number; results: TableResult[] }[] }
   | { type: "START_TOP8" }
   | { type: "GENERATE_TOP8_ROUND" }
   | { type: "IMPORT_STATE"; state: TournamentState }
@@ -130,6 +131,27 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
 
       // If round is complete, apply results for ALL tables
       if (round.isComplete) {
+        return applyResults(newState, action.roundIndex);
+      }
+
+      return newState;
+    }
+
+    case "BATCH_SUBMIT_TABLE_RESULTS": {
+      let newState = structuredClone(state);
+      const batchRound = newState.rounds[action.roundIndex];
+      if (!batchRound) return state;
+
+      for (const { tableId, results } of action.tables) {
+        const table = batchRound.tables.find((t) => t.id === tableId);
+        if (!table) continue;
+        table.results = results;
+        table.isComplete = true;
+      }
+
+      batchRound.isComplete = batchRound.tables.every((t) => t.isComplete);
+
+      if (batchRound.isComplete) {
         return applyResults(newState, action.roundIndex);
       }
 
@@ -306,6 +328,13 @@ export function useTournamentState() {
     []
   );
 
+  const batchSubmitTableResults = useCallback(
+    (roundIndex: number, tables: { tableId: number; results: TableResult[] }[]) => {
+      dispatch({ type: "BATCH_SUBMIT_TABLE_RESULTS", roundIndex, tables });
+    },
+    []
+  );
+
   const startTop8 = useCallback(() => {
     dispatch({ type: "START_TOP8" });
   }, []);
@@ -406,6 +435,7 @@ export function useTournamentState() {
     startTournament,
     generateRound,
     submitTableResults,
+    batchSubmitTableResults,
     startTop8,
     generateTop8Round,
     importState,
