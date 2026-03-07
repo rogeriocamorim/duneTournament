@@ -53,7 +53,7 @@ export interface TournamentState {
 }
 
 export const POINTS_MAP: Record<number, number> = {
-  1: 5,
+  1: 6,
   2: 3,
   3: 2,
   4: 1,

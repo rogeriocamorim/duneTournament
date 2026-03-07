@@ -1073,7 +1073,7 @@ describe("revertTableResults", () => {
 
     // Apply scoring
     state = applyResults(state, 0);
-    expect(state.players.find((p) => p.id === "1")!.points).toBe(5);
+    expect(state.players.find((p) => p.id === "1")!.points).toBe(6);
     expect(state.players.find((p) => p.id === "1")!.totalVP).toBe(12);
 
     // Revert scoring

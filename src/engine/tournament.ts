@@ -332,7 +332,7 @@ export function generateGrandFinal(semiRound: Round, redemptionRound: Round): Ta
 
 // ===== SCORING =====
 
-const POINTS: Record<number, number> = { 1: 5, 2: 3, 3: 2, 4: 1 };
+const POINTS: Record<number, number> = { 1: 6, 2: 3, 3: 2, 4: 1 };
 
 export function applyResults(state: TournamentState, roundIndex: number): TournamentState {
   const newState = structuredClone(state);

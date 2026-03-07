@@ -313,7 +313,7 @@ export function TableCard({
               {/* Points display */}
               {!editing && result?.position && (
                 <span className="text-score text-spice text-sm w-12 text-right">
-                  +{[5, 3, 2, 1][result.position - 1] || 0}
+                  +{[6, 3, 2, 1][result.position - 1] || 0}
                 </span>
               )}
             </div>
