@@ -161,7 +161,7 @@ export function LeaderReveal({ leaders, tier, onComplete, skipToGrid: skipToGrid
               <motion.img
                 src={getLeaderImageUrl(currentLeader)}
                 alt={currentLeader.name}
-                className="w-64 md:w-80 h-auto block"
+                className="w-[48rem] md:w-[60rem] h-auto block max-w-[90vw]"
                 initial={{ filter: "brightness(0)" }}
                 animate={{ filter: "brightness(1)" }}
                 transition={{ duration: 0.5, delay: 0.2 }}
@@ -211,7 +211,7 @@ export function LeaderReveal({ leaders, tier, onComplete, skipToGrid: skipToGrid
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="relative z-10 w-full max-w-5xl px-4 py-8 overflow-y-auto max-h-[90vh]"
+            className="relative z-10 w-full max-w-7xl px-4 py-8 overflow-y-auto max-h-[90vh]"
           >
             <h2
               className="text-display text-xl md:text-2xl text-center mb-6"
@@ -220,7 +220,7 @@ export function LeaderReveal({ leaders, tier, onComplete, skipToGrid: skipToGrid
               {config.label} &mdash; Available Leaders
             </h2>
 
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-3 justify-items-center mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 justify-items-center mb-8">
               {leaders.map((name, i) => {
                 const info = getLeaderInfo(name);
                 if (!info) return null;
@@ -242,7 +242,7 @@ export function LeaderReveal({ leaders, tier, onComplete, skipToGrid: skipToGrid
                       <img
                         src={getLeaderImageUrl(info)}
                         alt={info.name}
-                        className="w-24 md:w-32 h-auto block"
+                        className="w-48 md:w-64 h-auto block"
                       />
                       {info.isCommunity && (
                         <div className="absolute top-1 right-1 bg-fremen-blue/90 text-obsidian text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded-sm leading-tight">
@@ -250,7 +250,7 @@ export function LeaderReveal({ leaders, tier, onComplete, skipToGrid: skipToGrid
                         </div>
                       )}
                     </div>
-                    <p className="text-display text-[10px] md:text-xs text-center mt-2 leading-tight max-w-24 md:max-w-32" style={{ color: config.color }}>
+                    <p className="text-display text-[10px] md:text-xs text-center mt-2 leading-tight max-w-48 md:max-w-64" style={{ color: config.color }}>
                       {info.name}
                     </p>
                   </motion.div>
