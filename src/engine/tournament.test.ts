@@ -1697,9 +1697,10 @@ describe("getStandings — vpSharePct tiebreaker", () => {
     expect(standings[0].id).toBe("1"); // ShareKing wins — higher VP%
   });
 
-  it("vpSharePct breaks tie right after points (before wins and totalVP)", () => {
-    // Player 1 has higher VP share% (10/16=62.5%) vs Player 2 (10/34=29.4%)
-    // Even though Player 2 has more totalVP (20 vs 16), VP% wins after points
+  it("vpSharePct breaks tie after points and wins (before totalVP)", () => {
+    // Both players: 12 pts, same wins (2 each), but different VP share%
+    // Player 1: VP share 10/16=62.5%  |  Player 2: VP share 10/34=29.4%
+    // Same wins → VP% decides → Player 1 wins
     const players = [
       makePlayer("1", "HighShare", 12, 16, 6, 2),
       makePlayer("2", "LowShare", 12, 20, 6, 2),

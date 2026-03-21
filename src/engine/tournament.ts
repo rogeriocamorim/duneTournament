@@ -503,10 +503,10 @@ export function getStandings(players: Player[], rounds: Round[] = []): Player[] 
 
   return [...players].sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
+    if (b.wins !== a.wins) return b.wins - a.wins;
     const aShare = vpShareCache.get(a.id) ?? 0;
     const bShare = vpShareCache.get(b.id) ?? 0;
     if (bShare !== aShare) return bShare - aShare;
-    if (b.wins !== a.wins) return b.wins - a.wins;
     if (b.totalVP !== a.totalVP) return b.totalVP - a.totalVP;
     return a.efficiency - b.efficiency; // lower efficiency = better
   });
