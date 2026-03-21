@@ -13,7 +13,9 @@ export interface StandingsSnapshot {
     rank: number;
     name: string;
     points: number;
+    wins: number;
     totalVP: number;
+    vpSharePct: number;
     efficiency: number;
   }[];
 }

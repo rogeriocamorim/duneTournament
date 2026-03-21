@@ -17,6 +17,8 @@ import {
   randomTier,
   selectRoundLeaders,
   migrateLeaderNames,
+  backfillPlayerWins,
+  getVpSharePct,
 } from "../engine/tournament";
 import type { StandingsSnapshot } from "../utils/gistService";
 import { createStandingsBin, updateStandingsBin } from "../utils/jsonbinService";
@@ -237,6 +239,11 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
     case "IMPORT_STATE": {
       initializePlayerIds(action.state.players);
       migrateLeaderNames(action.state);
+      // Ensure wins field exists and is computed for imported states
+      for (const p of action.state.players) {
+        p.wins = p.wins ?? 0;
+      }
+      backfillPlayerWins(action.state);
       return action.state;
     }
 
@@ -289,6 +296,17 @@ function loadState(): TournamentState {
       const parsed = JSON.parse(stored) as TournamentState;
       initializePlayerIds(parsed.players);
       migrateLeaderNames(parsed);
+
+      // Backfill wins for states saved before the wins field existed
+      const needsBackfill = parsed.players.some((p) => p.wins === undefined || p.wins === null);
+      if (needsBackfill) {
+        // Ensure the field exists on all players before backfilling
+        for (const p of parsed.players) {
+          p.wins = p.wins ?? 0;
+        }
+        backfillPlayerWins(parsed);
+      }
+
       return parsed;
     }
   } catch {
@@ -367,7 +385,7 @@ export function useTournamentState() {
 
   const standings = state.phase === "finished"
     ? getFinalStandings(state)
-    : getStandings(state.players);
+    : getStandings(state.players, state.rounds);
 
   // Export as JSON
   const exportState = useCallback(() => {
@@ -387,7 +405,7 @@ export function useTournamentState() {
     // Build standings snapshot
     const currentStandings = state.phase === "finished"
       ? getFinalStandings(state)
-      : getStandings(state.players);
+      : getStandings(state.players, state.rounds);
 
     const snapshot: StandingsSnapshot = {
       metadata: {
@@ -401,7 +419,9 @@ export function useTournamentState() {
         rank: index + 1,
         name: player.name,
         points: player.points,
+        wins: player.wins,
         totalVP: player.totalVP,
+        vpSharePct: getVpSharePct(player.id, state.rounds),
         efficiency: player.efficiency,
       })),
     };

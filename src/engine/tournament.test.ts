@@ -13,13 +13,17 @@ import {
   selectRoundLeaders,
   migrateLeaderNames,
   generateSwissPairing,
+  snakeDraftOrder,
   revertTableResults,
+  backfillPlayerWins,
+  getRoundsPlayed,
+  getVpSharePct,
 } from "./tournament";
 
 // ===== TEST HELPERS =====
 
-function makePlayer(id: string, name: string, points: number, totalVP: number, efficiency: number): Player {
-  return { id, name, points, totalVP, efficiency, opponents: [] };
+function makePlayer(id: string, name: string, points: number, totalVP: number, efficiency: number, wins = 0): Player {
+  return { id, name, points, totalVP, wins, efficiency, opponents: [] };
 }
 
 /**
@@ -902,9 +906,36 @@ describe("migrateLeaderNames", () => {
   });
 });
 
-// ===== SWISS PAIRING — NO-REMATCH TESTS =====
+// ===== GOLF-STYLE PAIRING — SNAKE DRAFT + NO-REMATCH TESTS =====
 
-describe("generateSwissPairing", () => {
+describe("snakeDraftOrder", () => {
+  it("produces correct snake-draft for 16 players / 4 tables", () => {
+    const order = snakeDraftOrder(16);
+    // Row 0 (L→R): ranks 0-3 → tables 0,1,2,3
+    // Row 1 (R→L): ranks 4-7 → tables 3,2,1,0
+    // Row 2 (L→R): ranks 8-11 → tables 0,1,2,3
+    // Row 3 (R→L): ranks 12-15 → tables 3,2,1,0
+    expect(order).toEqual([0,1,2,3, 3,2,1,0, 0,1,2,3, 3,2,1,0]);
+  });
+
+  it("produces correct snake-draft for 8 players / 2 tables", () => {
+    const order = snakeDraftOrder(8);
+    expect(order).toEqual([0,1, 1,0, 0,1, 1,0]);
+  });
+
+  it("each table gets exactly 4 players", () => {
+    const order = snakeDraftOrder(20);
+    const counts = new Map<number, number>();
+    for (const t of order) {
+      counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+    for (const [, count] of counts) {
+      expect(count).toBe(4);
+    }
+  });
+});
+
+describe("generateSwissPairing — golf mode", () => {
   function makeQualifyingState(playerCount: number): TournamentState {
     const players: Player[] = [];
     for (let i = 0; i < playerCount; i++) {
@@ -1040,6 +1071,67 @@ describe("generateSwissPairing", () => {
       expect(t.id).toBe(i + 1);
     });
   });
+
+  it("tables have balanced skill distribution after scored rounds (golf, not Swiss)", () => {
+    // Create 16 players with varied points to simulate mid-tournament standings
+    const players: Player[] = [];
+    for (let i = 0; i < 16; i++) {
+      // Points range: top 4 get 12pts, next 4 get 6pts, next 4 get 3pts, bottom 4 get 0pts
+      const pointTier = Math.floor(i / 4);
+      const points = [12, 6, 3, 0][pointTier];
+      players.push(makePlayer(String(i + 1), `Player${i + 1}`, points, points * 2, pointTier, points === 12 ? 2 : points === 6 ? 1 : 0));
+    }
+    const state: TournamentState = {
+      metadata: { version: "1.0.0", timestamp: "", tournamentName: "Test" },
+      players,
+      rounds: [],
+      phase: "qualifying",
+      currentRound: 0,
+      settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
+    };
+
+    const tables = generateSwissPairing(state);
+
+    // Each table should NOT have all 4 players from the same point tier.
+    // In Swiss mode, all 12-point players would be at one table. In golf mode,
+    // they should be spread across different tables.
+    for (const table of tables) {
+      const tablePlayers = table.playerIds.map((id) =>
+        players.find((p) => p.id === id)!
+      );
+      const pointValues = tablePlayers.map((p) => p.points);
+      const uniquePointValues = new Set(pointValues);
+      // Each table should have players from at least 2 different point tiers
+      // (ideally 4, but anti-rematch swaps may shift things slightly)
+      expect(uniquePointValues.size).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("top-ranked player is NOT at the same table as rank 2-4 (golf spread)", () => {
+    // 16 players, each with unique points so rank is deterministic
+    const players: Player[] = [];
+    for (let i = 0; i < 16; i++) {
+      players.push(makePlayer(String(i + 1), `Player${i + 1}`, 16 - i, 0, 0));
+    }
+    const state: TournamentState = {
+      metadata: { version: "1.0.0", timestamp: "", tournamentName: "Test" },
+      players,
+      rounds: [],
+      phase: "qualifying",
+      currentRound: 0,
+      settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
+    };
+
+    const tables = generateSwissPairing(state);
+
+    // Find which table has the rank-1 player (id "1")
+    const rank1Table = tables.find((t) => t.playerIds.includes("1"))!;
+    // Rank 2, 3, 4 should NOT be at the same table as rank 1
+    // (snake draft puts rank 1 at T1, ranks 2-4 at T2-T4)
+    expect(rank1Table.playerIds).not.toContain("2");
+    expect(rank1Table.playerIds).not.toContain("3");
+    expect(rank1Table.playerIds).not.toContain("4");
+  });
 });
 
 // ===== REVERT TABLE RESULTS — OPPONENT CLEANUP =====
@@ -1169,5 +1261,467 @@ describe("revertTableResults", () => {
     expect(p5.opponents).toContain("6");
     expect(p5.opponents).toContain("7");
     expect(p5.opponents).toContain("8");
+  });
+});
+
+// ===== WINS TIEBREAKER TESTS =====
+
+describe("getStandings — wins tiebreaker", () => {
+  it("ranks player with more wins higher when points are equal", () => {
+    const players = [
+      makePlayer("1", "Alice", 12, 20, 6, 1),  // 1 win
+      makePlayer("2", "Bob",   12, 20, 6, 2),  // 2 wins
+    ];
+    const standings = getStandings(players);
+    expect(standings[0].id).toBe("2"); // Bob has more wins
+    expect(standings[1].id).toBe("1");
+  });
+
+  it("falls through to totalVP when points and wins are equal", () => {
+    const players = [
+      makePlayer("1", "Alice", 12, 18, 6, 2),
+      makePlayer("2", "Bob",   12, 22, 6, 2),
+    ];
+    const standings = getStandings(players);
+    expect(standings[0].id).toBe("2"); // Bob has more VP
+  });
+
+  it("falls through to efficiency when points, wins, and VP are equal", () => {
+    const players = [
+      makePlayer("1", "Alice", 12, 20, 8, 2),  // worse efficiency
+      makePlayer("2", "Bob",   12, 20, 5, 2),  // better efficiency
+    ];
+    const standings = getStandings(players);
+    expect(standings[0].id).toBe("2"); // Bob has lower efficiency (better)
+  });
+
+  it("points still take priority over wins", () => {
+    const players = [
+      makePlayer("1", "Alice", 15, 20, 6, 1),  // more points, fewer wins
+      makePlayer("2", "Bob",   12, 20, 6, 3),  // fewer points, more wins
+    ];
+    const standings = getStandings(players);
+    expect(standings[0].id).toBe("1"); // Alice has more points
+  });
+});
+
+describe("applyResults — wins tracking", () => {
+  it("increments wins for 1st-place finishes", () => {
+    const players = [
+      makePlayer("1", "A", 0, 0, 0),
+      makePlayer("2", "B", 0, 0, 0),
+      makePlayer("3", "C", 0, 0, 0),
+      makePlayer("4", "D", 0, 0, 0),
+    ];
+    let state: TournamentState = {
+      metadata: { version: "1.0.0", timestamp: "", tournamentName: "Test" },
+      players,
+      rounds: [{
+        number: 1,
+        tables: [makeCompletedTable(1, [
+          { playerId: "1", position: 1, vp: 12 },
+          { playerId: "2", position: 2, vp: 9 },
+          { playerId: "3", position: 3, vp: 6 },
+          { playerId: "4", position: 4, vp: 3 },
+        ])],
+        isComplete: true,
+        type: "qualifying",
+      }],
+      phase: "qualifying",
+      currentRound: 1,
+      settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
+    };
+
+    state = applyResults(state, 0);
+    expect(state.players.find((p) => p.id === "1")!.wins).toBe(1);
+    expect(state.players.find((p) => p.id === "2")!.wins).toBe(0);
+    expect(state.players.find((p) => p.id === "3")!.wins).toBe(0);
+    expect(state.players.find((p) => p.id === "4")!.wins).toBe(0);
+  });
+
+  it("revertTableResults decrements wins", () => {
+    const players = [
+      makePlayer("1", "A", 0, 0, 0),
+      makePlayer("2", "B", 0, 0, 0),
+      makePlayer("3", "C", 0, 0, 0),
+      makePlayer("4", "D", 0, 0, 0),
+    ];
+    let state: TournamentState = {
+      metadata: { version: "1.0.0", timestamp: "", tournamentName: "Test" },
+      players,
+      rounds: [{
+        number: 1,
+        tables: [makeCompletedTable(1, [
+          { playerId: "1", position: 1, vp: 12 },
+          { playerId: "2", position: 2, vp: 9 },
+          { playerId: "3", position: 3, vp: 6 },
+          { playerId: "4", position: 4, vp: 3 },
+        ])],
+        isComplete: true,
+        type: "qualifying",
+      }],
+      phase: "qualifying",
+      currentRound: 1,
+      settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
+    };
+
+    state = applyResults(state, 0);
+    expect(state.players.find((p) => p.id === "1")!.wins).toBe(1);
+
+    state = revertTableResults(state, 0, 1);
+    expect(state.players.find((p) => p.id === "1")!.wins).toBe(0);
+  });
+});
+
+describe("backfillPlayerWins", () => {
+  it("computes wins from completed round data", () => {
+    const players = [
+      makePlayer("1", "A", 6, 12, 1),
+      makePlayer("2", "B", 3, 9, 2),
+      makePlayer("3", "C", 2, 6, 3),
+      makePlayer("4", "D", 1, 3, 4),
+    ];
+    const state: TournamentState = {
+      metadata: { version: "1.0.0", timestamp: "", tournamentName: "Test" },
+      players,
+      rounds: [{
+        number: 1,
+        tables: [makeCompletedTable(1, [
+          { playerId: "1", position: 1, vp: 12 },
+          { playerId: "2", position: 2, vp: 9 },
+          { playerId: "3", position: 3, vp: 6 },
+          { playerId: "4", position: 4, vp: 3 },
+        ])],
+        isComplete: true,
+        type: "qualifying",
+      }],
+      phase: "qualifying",
+      currentRound: 1,
+      settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
+    };
+
+    // Players have wins=0 initially
+    expect(state.players[0].wins).toBe(0);
+    backfillPlayerWins(state);
+    expect(state.players[0].wins).toBe(1);
+    expect(state.players[1].wins).toBe(0);
+  });
+
+  it("counts wins across multiple rounds", () => {
+    const players = [
+      makePlayer("1", "A", 12, 24, 2),
+      makePlayer("2", "B", 6, 18, 4),
+      makePlayer("3", "C", 4, 12, 6),
+      makePlayer("4", "D", 2, 6, 8),
+    ];
+    const state: TournamentState = {
+      metadata: { version: "1.0.0", timestamp: "", tournamentName: "Test" },
+      players,
+      rounds: [
+        makeRound(1, "qualifying", [makeCompletedTable(1, [
+          { playerId: "1", position: 1, vp: 12 },
+          { playerId: "2", position: 2, vp: 9 },
+          { playerId: "3", position: 3, vp: 6 },
+          { playerId: "4", position: 4, vp: 3 },
+        ])]),
+        makeRound(2, "qualifying", [makeCompletedTable(1, [
+          { playerId: "1", position: 1, vp: 12 },
+          { playerId: "2", position: 2, vp: 9 },
+          { playerId: "3", position: 3, vp: 6 },
+          { playerId: "4", position: 4, vp: 3 },
+        ])]),
+      ],
+      phase: "qualifying",
+      currentRound: 2,
+      settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
+    };
+
+    backfillPlayerWins(state);
+    expect(state.players[0].wins).toBe(2);
+    expect(state.players[1].wins).toBe(0);
+  });
+
+  it("skips incomplete rounds", () => {
+    const players = [makePlayer("1", "A", 0, 0, 0)];
+    const state: TournamentState = {
+      metadata: { version: "1.0.0", timestamp: "", tournamentName: "Test" },
+      players,
+      rounds: [{
+        number: 1,
+        tables: [makeCompletedTable(1, [{ playerId: "1", position: 1, vp: 12 }])],
+        isComplete: false,
+        type: "qualifying",
+      }],
+      phase: "qualifying",
+      currentRound: 1,
+      settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
+    };
+
+    backfillPlayerWins(state);
+    expect(state.players[0].wins).toBe(0);
+  });
+});
+
+describe("getRoundsPlayed", () => {
+  it("counts completed rounds a player participated in", () => {
+    const rounds: Round[] = [
+      makeRound(1, "qualifying", [makeCompletedTable(1, [
+        { playerId: "1", position: 1, vp: 12 },
+        { playerId: "2", position: 2, vp: 9 },
+        { playerId: "3", position: 3, vp: 6 },
+        { playerId: "4", position: 4, vp: 3 },
+      ])]),
+      makeRound(2, "qualifying", [makeCompletedTable(1, [
+        { playerId: "1", position: 1, vp: 12 },
+        { playerId: "2", position: 2, vp: 9 },
+        { playerId: "3", position: 3, vp: 6 },
+        { playerId: "4", position: 4, vp: 3 },
+      ])]),
+    ];
+
+    expect(getRoundsPlayed("1", rounds)).toBe(2);
+  });
+
+  it("returns 0 for a player not in any round", () => {
+    const rounds: Round[] = [
+      makeRound(1, "qualifying", [makeCompletedTable(1, [
+        { playerId: "1", position: 1, vp: 12 },
+        { playerId: "2", position: 2, vp: 9 },
+        { playerId: "3", position: 3, vp: 6 },
+        { playerId: "4", position: 4, vp: 3 },
+      ])]),
+    ];
+
+    expect(getRoundsPlayed("99", rounds)).toBe(0);
+  });
+
+  it("excludes incomplete rounds", () => {
+    const rounds: Round[] = [
+      makeRound(1, "qualifying", [makeCompletedTable(1, [
+        { playerId: "1", position: 1, vp: 12 },
+        { playerId: "2", position: 2, vp: 9 },
+        { playerId: "3", position: 3, vp: 6 },
+        { playerId: "4", position: 4, vp: 3 },
+      ])]),
+      {
+        number: 2,
+        tables: [makeCompletedTable(1, [
+          { playerId: "1", position: 1, vp: 12 },
+          { playerId: "2", position: 2, vp: 9 },
+          { playerId: "3", position: 3, vp: 6 },
+          { playerId: "4", position: 4, vp: 3 },
+        ])],
+        isComplete: false,
+        type: "qualifying",
+      },
+    ];
+
+    expect(getRoundsPlayed("1", rounds)).toBe(1);
+  });
+});
+
+// ===== VP SHARE PERCENTAGE TESTS =====
+
+describe("getVpSharePct", () => {
+  it("computes VP share % for a single game", () => {
+    // Player 1 scored 10 VP at a table with total 33 VP → 30.30%
+    const rounds: Round[] = [
+      makeRound(1, "qualifying", [makeCompletedTable(1, [
+        { playerId: "1", position: 1, vp: 10 },
+        { playerId: "2", position: 2, vp: 9 },
+        { playerId: "3", position: 3, vp: 8 },
+        { playerId: "4", position: 4, vp: 6 },
+      ])]),
+    ];
+
+    const pct = getVpSharePct("1", rounds);
+    // 10/33 * 100 = 30.303...
+    expect(pct).toBeCloseTo(30.303, 2);
+  });
+
+  it("averages VP share across multiple rounds (Rob's example)", () => {
+    // Player 1: 10/33 game 1 = 30.30%, 6/29 game 2 = 20.69%
+    // Average: (30.30 + 20.69) / 2 = 25.50%
+    const rounds: Round[] = [
+      makeRound(1, "qualifying", [makeCompletedTable(1, [
+        { playerId: "1", position: 1, vp: 10 },
+        { playerId: "2", position: 2, vp: 9 },
+        { playerId: "3", position: 3, vp: 8 },
+        { playerId: "4", position: 4, vp: 6 },
+      ])]),
+      makeRound(2, "qualifying", [makeCompletedTable(1, [
+        { playerId: "1", position: 3, vp: 6 },
+        { playerId: "5", position: 1, vp: 10 },
+        { playerId: "6", position: 2, vp: 8 },
+        { playerId: "7", position: 4, vp: 5 },
+      ])]),
+    ];
+
+    const pct = getVpSharePct("1", rounds);
+    // (10/33*100 + 6/29*100) / 2 = (30.303 + 20.690) / 2 = 25.496
+    expect(pct).toBeCloseTo(25.497, 1);
+  });
+
+  it("VP share tiebreak: player with higher share wins despite lower raw VP", () => {
+    // Rob's example:
+    // Player 1: 10/33 + 6/29 = 16 VP total, share = 25.50%
+    // Player 2: 11/38 + 7/34 = 18 VP total, share = 24.76%
+    // Player 1 should rank higher due to higher share
+    const rounds: Round[] = [
+      makeRound(1, "qualifying", [
+        makeCompletedTable(1, [
+          { playerId: "1", position: 1, vp: 10 },
+          { playerId: "A", position: 2, vp: 9 },
+          { playerId: "B", position: 3, vp: 8 },
+          { playerId: "C", position: 4, vp: 6 },
+        ]),
+        makeCompletedTable(2, [
+          { playerId: "2", position: 1, vp: 11 },
+          { playerId: "D", position: 2, vp: 10 },
+          { playerId: "E", position: 3, vp: 9 },
+          { playerId: "F", position: 4, vp: 8 },
+        ]),
+      ]),
+      makeRound(2, "qualifying", [
+        makeCompletedTable(1, [
+          { playerId: "1", position: 3, vp: 6 },
+          { playerId: "G", position: 1, vp: 10 },
+          { playerId: "H", position: 2, vp: 8 },
+          { playerId: "I", position: 4, vp: 5 },
+        ]),
+        makeCompletedTable(2, [
+          { playerId: "2", position: 2, vp: 7 },
+          { playerId: "J", position: 1, vp: 11 },
+          { playerId: "K", position: 3, vp: 9 },
+          { playerId: "L", position: 4, vp: 7 },
+        ]),
+      ]),
+    ];
+
+    const share1 = getVpSharePct("1", rounds);
+    const share2 = getVpSharePct("2", rounds);
+
+    // Player 1: (10/33 + 6/29) / 2 = 25.50%
+    // Player 2: (11/38 + 7/34) / 2 = 24.76%
+    expect(share1).toBeGreaterThan(share2);
+  });
+
+  it("returns 0 for unknown player", () => {
+    const rounds: Round[] = [
+      makeRound(1, "qualifying", [makeCompletedTable(1, [
+        { playerId: "1", position: 1, vp: 10 },
+        { playerId: "2", position: 2, vp: 9 },
+        { playerId: "3", position: 3, vp: 8 },
+        { playerId: "4", position: 4, vp: 6 },
+      ])]),
+    ];
+
+    expect(getVpSharePct("99", rounds)).toBe(0);
+  });
+
+  it("skips incomplete rounds", () => {
+    const rounds: Round[] = [
+      makeRound(1, "qualifying", [makeCompletedTable(1, [
+        { playerId: "1", position: 1, vp: 10 },
+        { playerId: "2", position: 2, vp: 9 },
+        { playerId: "3", position: 3, vp: 8 },
+        { playerId: "4", position: 4, vp: 6 },
+      ])]),
+      {
+        number: 2,
+        tables: [makeCompletedTable(1, [
+          { playerId: "1", position: 1, vp: 12 },
+          { playerId: "5", position: 2, vp: 9 },
+          { playerId: "6", position: 3, vp: 6 },
+          { playerId: "7", position: 4, vp: 3 },
+        ])],
+        isComplete: false,
+        type: "qualifying",
+      },
+    ];
+
+    // Only round 1 counts: 10/33 * 100 = 30.303
+    expect(getVpSharePct("1", rounds)).toBeCloseTo(30.303, 2);
+  });
+
+  it("returns 0 when no completed rounds", () => {
+    expect(getVpSharePct("1", [])).toBe(0);
+  });
+});
+
+describe("getStandings — vpSharePct tiebreaker", () => {
+  it("ranks player with higher VP share above one with more raw VP", () => {
+    // Both players: 12 points, 2 wins, same totalVP=16
+    // But different VP Share %
+    const players = [
+      makePlayer("1", "ShareKing", 12, 16, 6, 2),
+      makePlayer("2", "RawVPKing", 12, 16, 6, 2),
+    ];
+
+    // Player 1 at lower-scoring tables (higher share):
+    //   Round 1: 10/33 = 30.3%, Round 2: 6/29 = 20.7% → avg 25.5%
+    // Player 2 at higher-scoring tables (lower share):
+    //   Round 1: 11/38 = 28.9%, Round 2: 5/34 = 14.7% → avg 21.8%
+    const rounds: Round[] = [
+      makeRound(1, "qualifying", [
+        makeCompletedTable(1, [
+          { playerId: "1", position: 1, vp: 10 },
+          { playerId: "A", position: 2, vp: 9 },
+          { playerId: "B", position: 3, vp: 8 },
+          { playerId: "C", position: 4, vp: 6 },
+        ]),
+        makeCompletedTable(2, [
+          { playerId: "2", position: 1, vp: 11 },
+          { playerId: "D", position: 2, vp: 10 },
+          { playerId: "E", position: 3, vp: 9 },
+          { playerId: "F", position: 4, vp: 8 },
+        ]),
+      ]),
+      makeRound(2, "qualifying", [
+        makeCompletedTable(1, [
+          { playerId: "1", position: 3, vp: 6 },
+          { playerId: "G", position: 1, vp: 10 },
+          { playerId: "H", position: 2, vp: 8 },
+          { playerId: "I", position: 4, vp: 5 },
+        ]),
+        makeCompletedTable(2, [
+          { playerId: "2", position: 3, vp: 5 },
+          { playerId: "J", position: 1, vp: 12 },
+          { playerId: "K", position: 2, vp: 10 },
+          { playerId: "L", position: 4, vp: 7 },
+        ]),
+      ]),
+    ];
+
+    const standings = getStandings(players, rounds);
+    expect(standings[0].id).toBe("1"); // ShareKing wins — higher VP%
+  });
+
+  it("vpSharePct breaks tie only when points, wins, and totalVP are all equal", () => {
+    // Player with more totalVP should still rank above one with higher share%
+    const players = [
+      makePlayer("1", "LessVP", 12, 16, 6, 2),
+      makePlayer("2", "MoreVP", 12, 20, 6, 2),
+    ];
+
+    const rounds: Round[] = [
+      makeRound(1, "qualifying", [
+        makeCompletedTable(1, [
+          { playerId: "1", position: 1, vp: 10 },
+          { playerId: "A", position: 2, vp: 2 },
+          { playerId: "B", position: 3, vp: 2 },
+          { playerId: "C", position: 4, vp: 2 },
+        ]),
+        makeCompletedTable(2, [
+          { playerId: "2", position: 1, vp: 10 },
+          { playerId: "D", position: 2, vp: 9 },
+          { playerId: "E", position: 3, vp: 8 },
+          { playerId: "F", position: 4, vp: 7 },
+        ]),
+      ]),
+    ];
+
+    const standings = getStandings(players, rounds);
+    expect(standings[0].id).toBe("2"); // MoreVP wins on totalVP before share% kicks in
   });
 });

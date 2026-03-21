@@ -48,11 +48,20 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
         id: s.name, // Use name as ID for spectator view
         name: s.name,
         points: s.points,
+        wins: s.wins ?? 0,
         totalVP: s.totalVP,
         efficiency: s.efficiency,
         opponents: [],
       }))
     : [];
+
+  // Build pre-computed VP Share % map from snapshot (spectator has no round data)
+  const vpSharePctMap = new Map<string, number>();
+  if (snapshot) {
+    for (const s of snapshot.standings) {
+      vpSharePctMap.set(s.name, s.vpSharePct ?? 0);
+    }
+  }
 
   if (state === "loading") {
     return (
@@ -143,7 +152,7 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <Leaderboard players={players} />
+          <Leaderboard players={players} vpSharePctMap={vpSharePctMap} />
         </motion.div>
 
         {/* Footer hint */}

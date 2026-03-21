@@ -1,31 +1,38 @@
 import { motion } from "motion/react";
-import type { Player } from "../engine/types";
-import { getStandings } from "../engine/tournament";
+import type { Player, Round } from "../engine/types";
+import { getStandings, getVpSharePct } from "../engine/tournament";
 
 interface LeaderboardProps {
   players: Player[];
   highlightTop?: number;
   /** Pre-sorted standings to use instead of default getStandings() */
   finalStandings?: Player[];
+  /** Rounds data — used to compute VP Share % per player */
+  rounds?: Round[];
+  /** Pre-computed VP Share % values (keyed by player id). Used by spectator view. */
+  vpSharePctMap?: Map<string, number>;
 }
 
-export function Leaderboard({ players, highlightTop = 0, finalStandings }: LeaderboardProps) {
-  const standings = finalStandings ?? getStandings(players);
+export function Leaderboard({ players, highlightTop = 0, finalStandings, rounds = [], vpSharePctMap }: LeaderboardProps) {
+  const standings = finalStandings ?? getStandings(players, rounds);
 
   return (
     <div className="space-y-2">
       {/* Header */}
-      <div className="grid grid-cols-[3rem_1fr_4rem_4rem] gap-2 px-4 py-2 text-xs uppercase tracking-[0.2em] opacity-50">
+      <div className="grid grid-cols-[2.5rem_1fr_3rem_2.5rem_3rem_3.5rem] gap-1 px-4 py-2 text-xs uppercase tracking-[0.15em] opacity-50">
         <span>#</span>
         <span>Player</span>
         <span className="text-right">Pts</span>
+        <span className="text-right">W</span>
         <span className="text-right">VP</span>
+        <span className="text-right">VP%</span>
       </div>
 
       {/* Players */}
       {standings.map((player, index) => {
         const rank = index + 1;
         const isTopCut = highlightTop > 0 && rank <= highlightTop;
+        const vpSharePct = vpSharePctMap?.get(player.id) ?? getVpSharePct(player.id, rounds);
 
         return (
           <motion.div
@@ -39,7 +46,7 @@ export function Leaderboard({ players, highlightTop = 0, finalStandings }: Leade
               opacity: { duration: 0.3, delay: index * 0.03 },
             }}
             className={`
-              grid grid-cols-[3rem_1fr_4rem_4rem] gap-2 px-4 py-3 rounded-sm
+              grid grid-cols-[2.5rem_1fr_3rem_2.5rem_3rem_3.5rem] gap-1 px-4 py-3 rounded-sm
               ${isTopCut ? "stone-card spice-glow" : "glass-morphism"}
               ${rank === 1 ? "border-l-4 border-l-[#FFD700]" : ""}
               ${rank === 2 ? "border-l-4 border-l-[#C0C0C0]" : ""}
@@ -59,8 +66,14 @@ export function Leaderboard({ players, highlightTop = 0, finalStandings }: Leade
             <span className="text-score text-right text-spice text-lg">
               {player.points}
             </span>
+            <span className="text-score text-right text-sm text-fremen-blue">
+              {player.wins}
+            </span>
             <span className="text-score text-right text-sm opacity-70">
               {player.totalVP}
+            </span>
+            <span className="text-score text-right text-sm opacity-50">
+              {vpSharePct.toFixed(1)}
             </span>
           </motion.div>
         );

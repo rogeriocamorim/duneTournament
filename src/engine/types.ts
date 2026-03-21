@@ -5,7 +5,8 @@ export interface Player {
   name: string;
   points: number;
   totalVP: number;
-  efficiency: number; // lower = better (sum of game round finishes)
+  wins: number;        // count of 1st-place finishes (tiebreaker after points)
+  efficiency: number;  // lower = better (sum of game round finishes)
   opponents: string[]; // ids of players already faced
 }
 
@@ -188,6 +189,7 @@ export interface ExportSchema {
     name: string;
     points: number;
     totalVP: number;
+    wins: number;
     efficiency: number;
   }[];
   history: {

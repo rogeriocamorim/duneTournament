@@ -350,6 +350,7 @@ export function DashboardPage({
           <Leaderboard
             players={state.players}
             highlightTop={qualifyingDone ? 16 : 0}
+            rounds={state.rounds}
           />
         </motion.div>
       )}

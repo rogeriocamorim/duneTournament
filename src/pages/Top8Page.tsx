@@ -386,7 +386,7 @@ export function Top8Page({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
             >
-              <Leaderboard players={state.players} highlightTop={16} finalStandings={finalStandings} />
+              <Leaderboard players={state.players} highlightTop={16} finalStandings={finalStandings} rounds={state.rounds} />
             </motion.div>
           )}
         </div>
