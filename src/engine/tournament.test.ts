@@ -529,8 +529,8 @@ describe("getFinalStandings", () => {
     // Remove the grand final round
     state.rounds = state.rounds.filter((r) => r.type !== "grand-final");
     const standings = getFinalStandings(state);
-    // Should be pure cumulative ordering — same as getStandings
-    const expected = getStandings(state.players);
+    // Should be pure cumulative ordering — same as getStandings (with rounds for VP%)
+    const expected = getStandings(state.players, state.rounds);
     expect(standings.map((p) => p.id)).toEqual(expected.map((p) => p.id));
   });
 
@@ -538,7 +538,7 @@ describe("getFinalStandings", () => {
     const gfRound = state.rounds.find((r) => r.type === "grand-final")!;
     gfRound.isComplete = false;
     const standings = getFinalStandings(state);
-    const expected = getStandings(state.players);
+    const expected = getStandings(state.players, state.rounds);
     expect(standings.map((p) => p.id)).toEqual(expected.map((p) => p.id));
   });
 });
@@ -1697,11 +1697,12 @@ describe("getStandings — vpSharePct tiebreaker", () => {
     expect(standings[0].id).toBe("1"); // ShareKing wins — higher VP%
   });
 
-  it("vpSharePct breaks tie only when points, wins, and totalVP are all equal", () => {
-    // Player with more totalVP should still rank above one with higher share%
+  it("vpSharePct breaks tie right after points (before wins and totalVP)", () => {
+    // Player 1 has higher VP share% (10/16=62.5%) vs Player 2 (10/34=29.4%)
+    // Even though Player 2 has more totalVP (20 vs 16), VP% wins after points
     const players = [
-      makePlayer("1", "LessVP", 12, 16, 6, 2),
-      makePlayer("2", "MoreVP", 12, 20, 6, 2),
+      makePlayer("1", "HighShare", 12, 16, 6, 2),
+      makePlayer("2", "LowShare", 12, 20, 6, 2),
     ];
 
     const rounds: Round[] = [
@@ -1722,6 +1723,6 @@ describe("getStandings — vpSharePct tiebreaker", () => {
     ];
 
     const standings = getStandings(players, rounds);
-    expect(standings[0].id).toBe("2"); // MoreVP wins on totalVP before share% kicks in
+    expect(standings[0].id).toBe("1"); // HighShare wins on VP% (62.5% > 29.4%)
   });
 });
