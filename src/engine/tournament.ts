@@ -12,6 +12,7 @@ export function createPlayer(name: string): Player {
     name: name.trim(),
     points: 0,
     totalVP: 0,
+    wins: 0,
     efficiency: 0,
     opponents: [],
   };
@@ -25,24 +26,41 @@ export function initializePlayerIds(players: Player[]): void {
 // ===== PAIRING ENGINE =====
 
 /**
- * Swiss-style pairing: group players by similar point totals,
- * then assign to tables while respecting the anti-repeat constraint.
+ * Golf-style pairing: rank players by standings, then snake-draft across
+ * tables so each table gets a mix of top, middle, and bottom players.
+ * Anti-rematch backtracking ensures no two players meet twice where possible.
+ *
+ * Snake-draft example (16 players, 4 tables):
+ *   T1: ranks 1, 8, 9, 16
+ *   T2: ranks 2, 7, 10, 15
+ *   T3: ranks 3, 6, 11, 14
+ *   T4: ranks 4, 5, 12, 13
  */
 export function generateSwissPairing(state: TournamentState): Table[] {
   const players = [...state.players];
 
-  // Sort by points (desc), then by VP (desc), then by efficiency (asc)
+  // Pre-compute VP Share % for sorting
+  const vpShareCache = new Map<string, number>();
+  for (const p of players) {
+    vpShareCache.set(p.id, getVpSharePct(p.id, state.rounds));
+  }
+
+  // Sort by points (desc), wins (desc), VP (desc), vpSharePct (desc), efficiency (asc)
   players.sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
+    if (b.wins !== a.wins) return b.wins - a.wins;
     if (b.totalVP !== a.totalVP) return b.totalVP - a.totalVP;
+    const aShare = vpShareCache.get(a.id) ?? 0;
+    const bShare = vpShareCache.get(b.id) ?? 0;
+    if (bShare !== aShare) return bShare - aShare;
     return a.efficiency - b.efficiency;
   });
 
   const playerIds = players.map((p) => p.id);
   const playerMap = new Map(state.players.map((p) => [p.id, p]));
 
-  // Try to create valid pairings with anti-repeat logic
-  const validPods = createValidPods(playerIds, playerMap);
+  // Try to create valid pairings with golf-style anti-repeat logic
+  const validPods = createGolfPods(playerIds, playerMap);
 
   return validPods.map((pod, index) => ({
     id: index + 1,
@@ -52,56 +70,68 @@ export function generateSwissPairing(state: TournamentState): Table[] {
   }));
 }
 
+/**
+ * Compute the snake-draft preferred table index for each rank position.
+ * Alternates direction each row of T assignments:
+ *   Row 0 (left→right): ranks 0..T-1 → tables 0..T-1
+ *   Row 1 (right→left): ranks T..2T-1 → tables T-1..0
+ *   Row 2 (left→right): ranks 2T..3T-1 → tables 0..T-1
+ *   Row 3 (right→left): ranks 3T..4T-1 → tables T-1..0
+ */
+export function snakeDraftOrder(playerCount: number): number[] {
+  const numTables = playerCount / 4;
+  const preferred: number[] = [];
+  for (let i = 0; i < playerCount; i++) {
+    const row = Math.floor(i / numTables);
+    const col = i % numTables;
+    const tableIdx = row % 2 === 0 ? col : numTables - 1 - col;
+    preferred.push(tableIdx);
+  }
+  return preferred;
+}
+
 /** Maximum backtracking iterations before falling back to greedy. */
 const MAX_BACKTRACK_ITERATIONS = 100_000;
 
 /**
- * Anti-repeat pairing: arranges players so no two have met before.
- * Uses recursive backtracking with a hard no-rematch constraint.
+ * Golf-style anti-repeat pairing: distributes players across tables using
+ * snake-draft for skill balance, with backtracking to avoid rematches.
+ *
+ * The solver tries each player's preferred (snake-draft) table first,
+ * then falls back to other tables. This biases toward balanced tables
+ * while still guaranteeing no rematches when possible.
+ *
  * Falls back to greedy conflict-minimization if no valid assignment exists
  * (e.g., too few players relative to rounds played).
  *
  * Player count MUST be divisible by 4 — all tables seat exactly 4.
  */
-function createValidPods(
+function createGolfPods(
   sortedIds: string[],
   playerMap: Map<string, Player>
 ): string[][] {
   const count = sortedIds.length;
   const numTables = count / 4;
 
-  // Group players by point brackets for Swiss-style
-  const brackets = new Map<number, string[]>();
-  for (const id of sortedIds) {
-    const p = playerMap.get(id)!;
-    const pts = p.points;
-    if (!brackets.has(pts)) brackets.set(pts, []);
-    brackets.get(pts)!.push(id);
-  }
-
-  // Flatten brackets (highest points first) with shuffle within brackets
-  const orderedIds: string[] = [];
-  const sortedBrackets = [...brackets.entries()].sort((a, b) => b[0] - a[0]);
-  for (const [, ids] of sortedBrackets) {
-    shuffleArray(ids);
-    orderedIds.push(...ids);
-  }
-
   // Build opponent sets for O(1) lookup
   const opponentSets = new Map<string, Set<string>>();
-  for (const id of orderedIds) {
+  for (const id of sortedIds) {
     const p = playerMap.get(id)!;
     opponentSets.set(id, new Set(p.opponents));
   }
 
+  // Compute preferred table for each player rank via snake draft
+  const preferredTable = snakeDraftOrder(count);
+
   // ── Backtracking solver ──
+  // Process players in rank order. For each player, try their preferred
+  // (snake-draft) table first, then the remaining tables in order.
+  // This biases toward golf-style distribution while allowing swaps
+  // to resolve rematch conflicts.
 
   const tables: string[][] = Array.from({ length: numTables }, () => []);
   let iterations = 0;
 
-  /**
-   * Check if placing `playerId` at `tables[tableIdx]` would cause a rematch.
-   */
   function hasConflict(playerId: string, tableIdx: number): boolean {
     const opps = opponentSets.get(playerId)!;
     for (const otherId of tables[tableIdx]) {
@@ -111,28 +141,26 @@ function createValidPods(
   }
 
   /**
-   * Recursively assign players[playerIdx..] to tables.
-   * Returns true if a complete valid assignment is found.
+   * Build table-try order: preferred table first, then the rest in order.
    */
+  function tableOrder(playerIdx: number): number[] {
+    const pref = preferredTable[playerIdx];
+    const order = [pref];
+    for (let t = 0; t < numTables; t++) {
+      if (t !== pref) order.push(t);
+    }
+    return order;
+  }
+
   function solve(playerIdx: number): boolean {
-    if (playerIdx === orderedIds.length) return true;
+    if (playerIdx === sortedIds.length) return true;
     if (++iterations > MAX_BACKTRACK_ITERATIONS) return false;
 
-    const playerId = orderedIds[playerIdx];
+    const playerId = sortedIds[playerIdx];
 
-    for (let t = 0; t < numTables; t++) {
+    for (const t of tableOrder(playerIdx)) {
       if (tables[t].length >= 4) continue;
       if (hasConflict(playerId, t)) continue;
-
-      // Skip duplicate-shaped tables: if this table is empty and
-      // a previous empty table exists, skip to avoid redundant branches
-      if (tables[t].length === 0) {
-        let hasPriorEmpty = false;
-        for (let p = 0; p < t; p++) {
-          if (tables[p].length === 0) { hasPriorEmpty = true; break; }
-        }
-        if (hasPriorEmpty) continue;
-      }
 
       tables[t].push(playerId);
       if (solve(playerIdx + 1)) return true;
@@ -146,17 +174,20 @@ function createValidPods(
     return tables;
   }
 
-  // ── Fallback: greedy conflict-minimization ──
-  // Used when no conflict-free pairing exists (e.g., 8 players after 3+ rounds)
+  // ── Fallback: greedy conflict-minimization with golf preference ──
+  // Used when no conflict-free pairing exists (e.g., 8 players after 3+ rounds).
+  // Prefers the snake-draft table, breaking ties by fewest conflicts.
 
   const fallbackTables: string[][] = Array.from({ length: numTables }, () => []);
 
-  for (const playerId of orderedIds) {
+  for (let i = 0; i < sortedIds.length; i++) {
+    const playerId = sortedIds[i];
     const opps = opponentSets.get(playerId)!;
     let bestTable = -1;
     let bestConflicts = Infinity;
+    let bestIsPreferred = false;
 
-    for (let t = 0; t < numTables; t++) {
+    for (const t of tableOrder(i)) {
       if (fallbackTables[t].length >= 4) continue;
 
       let conflicts = 0;
@@ -164,9 +195,16 @@ function createValidPods(
         if (opps.has(otherId)) conflicts++;
       }
 
-      if (conflicts < bestConflicts) {
+      const isPreferred = t === preferredTable[i];
+
+      // Pick this table if: fewer conflicts, OR same conflicts but preferred
+      if (
+        conflicts < bestConflicts ||
+        (conflicts === bestConflicts && isPreferred && !bestIsPreferred)
+      ) {
         bestConflicts = conflicts;
         bestTable = t;
+        bestIsPreferred = isPreferred;
       }
     }
 
@@ -207,7 +245,7 @@ function shuffleArray<T>(arr: T[]): void {
  * Get top 16 players by standings.
  */
 export function getTopCut(state: TournamentState): Player[] {
-  return getStandings(state.players).slice(0, state.settings.topCut);
+  return getStandings(state.players, state.rounds).slice(0, state.settings.topCut);
 }
 
 /**
@@ -348,6 +386,7 @@ export function applyResults(state: TournamentState, roundIndex: number): Tourna
       player.points += POINTS[result.position] || 0;
       player.totalVP += result.vp;
       player.efficiency += result.position;
+      if (result.position === 1) player.wins++;
 
       // Track opponents
       for (const otherId of table.playerIds) {
@@ -380,6 +419,7 @@ export function revertTableResults(state: TournamentState, roundIndex: number, t
     player.points -= POINTS[result.position] || 0;
     player.totalVP -= result.vp;
     player.efficiency -= result.position;
+    if (result.position === 1) player.wins--;
 
     // Remove opponents that were added when this table was scored.
     // Note: this is safe for qualifying rounds where the no-rematch
@@ -412,6 +452,7 @@ export function applyTableResults(state: TournamentState, roundIndex: number, ta
     player.points += POINTS[result.position] || 0;
     player.totalVP += result.vp;
     player.efficiency += result.position;
+    if (result.position === 1) player.wins++;
 
     // Track opponents
     for (const otherId of table.playerIds) {
@@ -426,16 +467,53 @@ export function applyTableResults(state: TournamentState, roundIndex: number, ta
 
 // ===== RANKINGS =====
 
-export function getStandings(players: Player[]): Player[] {
+/**
+ * Compute VP Share % for a player across all completed rounds.
+ * Per game: (playerVP / tableTotal VP) × 100
+ * Overall: mean of all per-game percentages
+ */
+export function getVpSharePct(playerId: string, rounds: Round[]): number {
+  let totalPct = 0;
+  let gamesPlayed = 0;
+
+  for (const round of rounds) {
+    if (!round.isComplete) continue;
+    for (const table of round.tables) {
+      if (!table.isComplete || table.results.length === 0) continue;
+      const playerResult = table.results.find((r) => r.playerId === playerId);
+      if (!playerResult) continue;
+
+      const tableTotal = table.results.reduce((sum, r) => sum + r.vp, 0);
+      if (tableTotal > 0) {
+        totalPct += (playerResult.vp / tableTotal) * 100;
+      }
+      gamesPlayed++;
+    }
+  }
+
+  return gamesPlayed > 0 ? totalPct / gamesPlayed : 0;
+}
+
+export function getStandings(players: Player[], rounds: Round[] = []): Player[] {
+  // Pre-compute VP Share % for all players to avoid recalculating per comparison
+  const vpShareCache = new Map<string, number>();
+  for (const p of players) {
+    vpShareCache.set(p.id, getVpSharePct(p.id, rounds));
+  }
+
   return [...players].sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
+    if (b.wins !== a.wins) return b.wins - a.wins;
     if (b.totalVP !== a.totalVP) return b.totalVP - a.totalVP;
+    const aShare = vpShareCache.get(a.id) ?? 0;
+    const bShare = vpShareCache.get(b.id) ?? 0;
+    if (bShare !== aShare) return bShare - aShare;
     return a.efficiency - b.efficiency; // lower efficiency = better
   });
 }
 
 export function getTop8(state: TournamentState): Player[] {
-  return getStandings(state.players).slice(0, state.settings.topCut);
+  return getStandings(state.players, state.rounds).slice(0, state.settings.topCut);
 }
 
 /**
@@ -456,7 +534,7 @@ export function getFinalStandings(state: TournamentState): Player[] {
 
   // If no completed grand final, just use normal standings
   if (!grandFinal?.isComplete) {
-    return getStandings(state.players);
+    return getStandings(state.players, state.rounds);
   }
 
   // ── Tier 1: Grand Final finishers in placement order ──
@@ -487,13 +565,23 @@ export function getFinalStandings(state: TournamentState): Player[] {
       }
     }
 
-    // Sort by Round 6 placement first, then by cumulative points (desc), then VP (desc)
+    // Sort by Round 6 placement first, then by cumulative points (desc), wins (desc), VP (desc), vpSharePct (desc), efficiency (asc)
+    // Pre-compute VP Share % for Tier 2 players
+    const tier2VpShareCache = new Map<string, number>();
+    for (const r of redemptionLosers) {
+      tier2VpShareCache.set(r.playerId, getVpSharePct(r.playerId, state.rounds));
+    }
+
     redemptionLosers.sort((a, b) => {
       if (a.position !== b.position) return a.position - b.position;
       const pa = state.players.find((p) => p.id === a.playerId)!;
       const pb = state.players.find((p) => p.id === b.playerId)!;
       if (pb.points !== pa.points) return pb.points - pa.points;
+      if (pb.wins !== pa.wins) return pb.wins - pa.wins;
       if (pb.totalVP !== pa.totalVP) return pb.totalVP - pa.totalVP;
+      const aShare = tier2VpShareCache.get(a.playerId) ?? 0;
+      const bShare = tier2VpShareCache.get(b.playerId) ?? 0;
+      if (bShare !== aShare) return bShare - aShare;
       return pa.efficiency - pb.efficiency;
     });
 
@@ -526,11 +614,11 @@ export function getFinalStandings(state: TournamentState): Player[] {
       !grandFinalPlayerIds.has(p.id) &&
       !redemptionPlayerIds.has(p.id)
   );
-  const tier3 = getStandings(tier3Players);
+  const tier3 = getStandings(tier3Players, state.rounds);
 
   // ── Tier 4: Everyone else ──
   const tier4Players = state.players.filter((p) => !topCutPlayerIds.has(p.id));
-  const tier4 = getStandings(tier4Players);
+  const tier4 = getStandings(tier4Players, state.rounds);
 
   return [...tier1, ...tier2, ...tier3, ...tier4];
 }
@@ -641,6 +729,49 @@ export function selectRoundLeaders(tier: LeaderTier): LeaderInfo[] {
 }
 
 // ===== DATA MIGRATION =====
+
+/**
+ * Backfill the `wins` field on every player by scanning all completed rounds.
+ * Used when loading state saved before the `wins` field was introduced.
+ * Safe to call multiple times — it recomputes from scratch.
+ */
+export function backfillPlayerWins(state: TournamentState): void {
+  // Reset all wins to 0 before recomputing
+  for (const player of state.players) {
+    player.wins = player.wins ?? 0;
+  }
+
+  const playerMap = new Map(state.players.map((p) => [p.id, p]));
+  // Only count wins from rounds whose scoring was applied (isComplete)
+  for (const round of state.rounds) {
+    if (!round.isComplete) continue;
+    for (const table of round.tables) {
+      for (const result of table.results) {
+        if (result.position === 1) {
+          const player = playerMap.get(result.playerId);
+          if (player) player.wins++;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Count how many completed rounds a player has participated in.
+ */
+export function getRoundsPlayed(playerId: string, rounds: Round[]): number {
+  let count = 0;
+  for (const round of rounds) {
+    if (!round.isComplete) continue;
+    for (const table of round.tables) {
+      if (table.playerIds.includes(playerId)) {
+        count++;
+        break;
+      }
+    }
+  }
+  return count;
+}
 
 /** Map from legacy camelCase leader id → current display name */
 const LEADER_ID_TO_NAME = new Map<string, string>(
