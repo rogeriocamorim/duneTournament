@@ -188,8 +188,10 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
       if (!lastRound || !lastRound.isComplete) return state;
 
       if (lastRound.type === "semifinal") {
-        // Generate 2 Redemption tables from semifinal results
+        // Generate 3 Redemption tables: bye (2p) + 2 Lower Finals (4p each)
         const tables = generateFinalsRound6(lastRound);
+        // Auto-mark bye table (table 1) as complete — no game played
+        tables[0].isComplete = true;
         const cLeaders = selectRoundLeaders("C");
         const newRound: Round = {
           number: state.rounds.length + 1,
@@ -207,11 +209,8 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
       }
 
       if (lastRound.type === "winners-final") {
-        // Generate Grand Final: Elite winners (from semis) + Redemption winners
-        const semiRound = state.rounds.find((r) => r.type === "semifinal");
-        if (!semiRound) return state;
-
-        const grandFinalTable = generateGrandFinal(semiRound, lastRound);
+        // Generate Grand Final: Finalists from bye table + Lower Final winners
+        const grandFinalTable = generateGrandFinal(lastRound);
         const grandFinalTier = randomTier();
         const grandFinalLeaders = selectRoundLeaders(grandFinalTier);
         const newRound: Round = {

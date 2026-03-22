@@ -292,16 +292,21 @@ export function generateSemifinals(state: TournamentState): Table[] {
 }
 
 /**
- * Generate Round 7 Redemption tables from semifinal results (8 players → 2 tables of 4):
+ * Generate Round 7 Redemption tables from semifinal results (10 players → 3 tables):
  *
- *   Redemption 1 ("Trial of Gom Jabbar"):
- *     2nd, 3rd, 4th from Elite A  +  1st from Challenger C
+ *   Table 1 — Finalists (bye table, 2 players, no game played):
+ *     1st from Elite A  +  1st from Elite B
+ *     → Advance directly to Grand Final
  *
- *   Redemption 2 ("Water of Life"):
- *     2nd, 3rd, 4th from Elite B  +  1st from Challenger D
+ *   Table 2 — Lower Final 1 (4 players):
+ *     1st from Challenger C  +  3 random Elite losers (min 1 from each Elite table)
+ *
+ *   Table 3 — Lower Final 2 (4 players):
+ *     1st from Challenger D  +  3 remaining Elite losers
  *
  * Challenger 2nd-4th from C and D are ELIMINATED after Round 6.
- * Elite 1st from A and B advance directly to Grand Final.
+ * 6 Elite losers (2nd-4th from A and B) are randomly split between the two Lower Finals,
+ * with at least 1 from each Elite table in each Lower Final.
  */
 export function generateFinalsRound6(semiRound: Round): Table[] {
   const [eliteA, eliteB, challengerC, challengerD] = semiRound.tables;
@@ -315,28 +320,62 @@ export function generateFinalsRound6(semiRound: Round): Table[] {
   const sortedC = sortByResult(challengerC);
   const sortedD = sortByResult(challengerD);
 
+  // Elite winners advance to Finalists bye table
+  const eliteAWinner = sortedA[0].playerId;
+  const eliteBWinner = sortedB[0].playerId;
+
+  // Elite losers (2nd-4th from each Elite table)
+  const eliteALosers = [sortedA[1].playerId, sortedA[2].playerId, sortedA[3].playerId];
+  const eliteBLosers = [sortedB[1].playerId, sortedB[2].playerId, sortedB[3].playerId];
+
+  // Challenger winners
+  const challCWinner = sortedC[0].playerId;
+  const challDWinner = sortedD[0].playerId;
+
+  // Randomly distribute 6 Elite losers across 2 Lower Finals (3 each),
+  // with at least 1 from each Elite table in each Lower Final.
+  // Strategy: shuffle each group, pick 1 from A and 1 from B for LF1,
+  // then pick 1 more randomly from the remaining 4 for LF1, rest go to LF2.
+  const shuffledALosers = [...eliteALosers];
+  shuffleArray(shuffledALosers);
+  const shuffledBLosers = [...eliteBLosers];
+  shuffleArray(shuffledBLosers);
+
+  // Guarantee 1 from A, 1 from B in Lower Final 1
+  const lf1FromA = [shuffledALosers.pop()!];
+  const lf1FromB = [shuffledBLosers.pop()!];
+
+  // Remaining 4 losers: 2 from A, 2 from B — pick 1 more for LF1 randomly
+  const remainingPool = [
+    ...shuffledALosers.map((id) => ({ id, source: "A" as const })),
+    ...shuffledBLosers.map((id) => ({ id, source: "B" as const })),
+  ];
+  shuffleArray(remainingPool);
+  const thirdForLf1 = remainingPool.pop()!;
+  const lf2Remaining = remainingPool.map((e) => e.id);
+
+  const lf1Players = [challCWinner, ...lf1FromA, ...lf1FromB, thirdForLf1.id];
+  const lf2Players = [challDWinner, ...lf2Remaining];
+
   return [
-    // Redemption 1 ("Trial of Gom Jabbar"): 2nd/3rd/4th from Elite A + 1st from Challenger C
+    // Table 1 — Finalists (bye table, no game)
     {
       id: 1,
-      playerIds: [
-        sortedA[1].playerId,
-        sortedA[2].playerId,
-        sortedA[3].playerId,
-        sortedC[0].playerId,
-      ],
+      playerIds: [eliteAWinner, eliteBWinner],
       results: [],
       isComplete: false,
     },
-    // Redemption 2 ("Water of Life"): 2nd/3rd/4th from Elite B + 1st from Challenger D
+    // Table 2 — Lower Final 1
     {
       id: 2,
-      playerIds: [
-        sortedB[1].playerId,
-        sortedB[2].playerId,
-        sortedB[3].playerId,
-        sortedD[0].playerId,
-      ],
+      playerIds: lf1Players,
+      results: [],
+      isComplete: false,
+    },
+    // Table 3 — Lower Final 2
+    {
+      id: 3,
+      playerIds: lf2Players,
       results: [],
       isComplete: false,
     },
@@ -345,24 +384,24 @@ export function generateFinalsRound6(semiRound: Round): Table[] {
 
 /**
  * Generate Grand Final (1 table of 4):
- *   1st from Elite A  +  1st from Elite B
- *   + Winner of Redemption 1  +  Winner of Redemption 2
+ *   2 Finalists from bye table (table 1 of redemption round)
+ *   + Winner of Lower Final 1 (table 2)  +  Winner of Lower Final 2 (table 3)
  */
-export function generateGrandFinal(semiRound: Round, redemptionRound: Round): Table {
+export function generateGrandFinal(redemptionRound: Round): Table {
   const sortByResult = (table: Table) =>
     [...table.results].sort((a, b) => a.position - b.position);
 
-  // Elite winners: 1st place from Elite A (tables[0]) and Elite B (tables[1])
-  const eliteAWinner = sortByResult(semiRound.tables[0])[0].playerId;
-  const eliteBWinner = sortByResult(semiRound.tables[1])[0].playerId;
+  // Finalists from bye table (table id 1 — 2 players who auto-advance)
+  const byeTable = redemptionRound.tables[0];
+  const finalists = byeTable.playerIds;
 
-  // Redemption winners: 1st place from each Redemption table
-  const redemption1Winner = sortByResult(redemptionRound.tables[0])[0].playerId;
-  const redemption2Winner = sortByResult(redemptionRound.tables[1])[0].playerId;
+  // Lower Final winners: 1st place from each Lower Final table
+  const lf1Winner = sortByResult(redemptionRound.tables[1])[0].playerId;
+  const lf2Winner = sortByResult(redemptionRound.tables[2])[0].playerId;
 
   return {
     id: 1,
-    playerIds: [eliteAWinner, eliteBWinner, redemption1Winner, redemption2Winner],
+    playerIds: [...finalists, lf1Winner, lf2Winner],
     results: [],
     isComplete: false,
   };
@@ -521,8 +560,8 @@ export function getTop8(state: TournamentState): Player[] {
  * Once the Grand Final is complete:
  *
  *   Tier 1 (pos 1-4):  Grand Final placement order (1st = Emperor)
- *   Tier 2 (pos 5-10): Redemption Round losers (2nd-4th from each Redemption table)
- *                       — sorted by Round 6 placement, then cumulative points
+ *   Tier 2 (pos 5-10): Lower Final losers (2nd-4th from each Lower Final table)
+ *                       — sorted by LF placement, then cumulative points
  *   Tier 3 (pos 11-16): Eliminated in Round 5 (Challenger 2nd-4th from C/D)
  *                        — sorted by cumulative stats
  *   Tier 4 (pos 17+):  Everyone else by cumulative stats
@@ -547,32 +586,38 @@ export function getFinalStandings(state: TournamentState): Player[] {
     .map((r) => state.players.find((p) => p.id === r.playerId))
     .filter(Boolean) as Player[];
 
-  // ── Tier 2: Redemption Round losers (positions 2-4 from each Redemption table) ──
+  // ── Tier 2: Lower Final losers (positions 2-4 from each Lower Final table) ──
   const redemptionRound = state.rounds.find((r) => r.type === "winners-final");
   const redemptionPlayerIds = new Set<string>();
   let tier2: Player[] = [];
 
   if (redemptionRound?.isComplete) {
-    // Collect results from both Redemption tables, excluding winners (pos 1)
-    const redemptionLosers: { playerId: string; position: number }[] = [];
-
+    // Collect all player IDs from the redemption round (all 3 tables)
     for (const table of redemptionRound.tables) {
+      for (const pid of table.playerIds) {
+        redemptionPlayerIds.add(pid);
+      }
+    }
+
+    // Lower Final tables are tables[1] and tables[2] (table[0] is the bye table)
+    const lowerFinalTables = redemptionRound.tables.slice(1);
+    const lowerFinalLosers: { playerId: string; position: number }[] = [];
+
+    for (const table of lowerFinalTables) {
       for (const result of table.results) {
-        redemptionPlayerIds.add(result.playerId);
         if (result.position > 1) {
-          redemptionLosers.push({ playerId: result.playerId, position: result.position });
+          lowerFinalLosers.push({ playerId: result.playerId, position: result.position });
         }
       }
     }
 
-    // Sort by Round 6 placement first, then by cumulative points (desc), wins (desc), VP (desc), vpSharePct (desc), efficiency (asc)
-    // Pre-compute VP Share % for Tier 2 players
+    // Sort by LF placement first, then by cumulative points (desc), wins (desc), VP (desc), vpSharePct (desc), efficiency (asc)
     const tier2VpShareCache = new Map<string, number>();
-    for (const r of redemptionLosers) {
+    for (const r of lowerFinalLosers) {
       tier2VpShareCache.set(r.playerId, getVpSharePct(r.playerId, state.rounds));
     }
 
-    redemptionLosers.sort((a, b) => {
+    lowerFinalLosers.sort((a, b) => {
       if (a.position !== b.position) return a.position - b.position;
       const pa = state.players.find((p) => p.id === a.playerId)!;
       const pb = state.players.find((p) => p.id === b.playerId)!;
@@ -585,7 +630,7 @@ export function getFinalStandings(state: TournamentState): Player[] {
       return pa.efficiency - pb.efficiency;
     });
 
-    tier2 = redemptionLosers
+    tier2 = lowerFinalLosers
       .map((r) => state.players.find((p) => p.id === r.playerId))
       .filter(Boolean) as Player[];
   }

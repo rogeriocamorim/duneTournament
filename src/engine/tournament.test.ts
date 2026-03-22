@@ -178,50 +178,64 @@ describe("generateFinalsRound6", () => {
     semiRound = makeRound(6, "semifinal", [eliteA, eliteB, challC, challD]);
   });
 
-  it("produces exactly 2 redemption tables", () => {
+  it("produces exactly 3 tables: bye + 2 Lower Finals", () => {
     const tables = generateFinalsRound6(semiRound);
-    expect(tables).toHaveLength(2);
+    expect(tables).toHaveLength(3);
   });
 
-  it("each redemption table has 4 players", () => {
+  it("Table 1 (bye) has exactly 2 players: Elite A winner + Elite B winner", () => {
     const tables = generateFinalsRound6(semiRound);
-    tables.forEach((t) => expect(t.playerIds).toHaveLength(4));
+    const bye = tables[0];
+    expect(bye.playerIds).toHaveLength(2);
+    expect(bye.playerIds).toContain("1"); // Elite A winner
+    expect(bye.playerIds).toContain("2"); // Elite B winner
   });
 
-  it("Redemption 1 has Elite A losers (2nd/3rd/4th) + Challenger C winner (1st)", () => {
+  it("Table 2 (Lower Final 1) has 4 players: Challenger C winner + 3 Elite losers", () => {
     const tables = generateFinalsRound6(semiRound);
-    const r1 = tables[0].playerIds;
-    // Elite A 2nd/3rd/4th = players 4, 5, 8
-    expect(r1).toContain("4");
-    expect(r1).toContain("5");
-    expect(r1).toContain("8");
-    // Challenger C 1st = player 9
-    expect(r1).toContain("9");
-    // Must NOT contain Elite A winner
-    expect(r1).not.toContain("1");
+    const lf1 = tables[1];
+    expect(lf1.playerIds).toHaveLength(4);
+    expect(lf1.playerIds).toContain("9"); // Challenger C winner
   });
 
-  it("Redemption 2 has Elite B losers (2nd/3rd/4th) + Challenger D winner (1st)", () => {
+  it("Table 3 (Lower Final 2) has 4 players: Challenger D winner + 3 Elite losers", () => {
     const tables = generateFinalsRound6(semiRound);
-    const r2 = tables[1].playerIds;
-    // Elite B 2nd/3rd/4th = players 3, 6, 7
-    expect(r2).toContain("3");
-    expect(r2).toContain("6");
-    expect(r2).toContain("7");
-    // Challenger D 1st = player 13
-    expect(r2).toContain("13");
-    // Must NOT contain Elite B winner
-    expect(r2).not.toContain("2");
+    const lf2 = tables[2];
+    expect(lf2.playerIds).toHaveLength(4);
+    expect(lf2.playerIds).toContain("13"); // Challenger D winner
   });
 
-  it("Elite A and B winners do NOT appear in any redemption table", () => {
-    const tables = generateFinalsRound6(semiRound);
-    const allIds = tables.flatMap((t) => t.playerIds);
-    expect(allIds).not.toContain("1");
-    expect(allIds).not.toContain("2");
+  it("each Lower Final has at least 1 player from Elite A losers", () => {
+    // Run multiple times since distribution is random
+    const eliteALosers = new Set(["4", "5", "8"]);
+    for (let i = 0; i < 20; i++) {
+      const tables = generateFinalsRound6(semiRound);
+      const lf1HasA = tables[1].playerIds.some((id) => eliteALosers.has(id));
+      const lf2HasA = tables[2].playerIds.some((id) => eliteALosers.has(id));
+      expect(lf1HasA).toBe(true);
+      expect(lf2HasA).toBe(true);
+    }
   });
 
-  it("Challenger C/D losers (2nd-4th) are ELIMINATED — not in redemption tables", () => {
+  it("each Lower Final has at least 1 player from Elite B losers", () => {
+    const eliteBLosers = new Set(["3", "6", "7"]);
+    for (let i = 0; i < 20; i++) {
+      const tables = generateFinalsRound6(semiRound);
+      const lf1HasB = tables[1].playerIds.some((id) => eliteBLosers.has(id));
+      const lf2HasB = tables[2].playerIds.some((id) => eliteBLosers.has(id));
+      expect(lf1HasB).toBe(true);
+      expect(lf2HasB).toBe(true);
+    }
+  });
+
+  it("Elite A and B winners do NOT appear in any Lower Final table", () => {
+    const tables = generateFinalsRound6(semiRound);
+    const lfIds = [...tables[1].playerIds, ...tables[2].playerIds];
+    expect(lfIds).not.toContain("1");
+    expect(lfIds).not.toContain("2");
+  });
+
+  it("Challenger C/D losers (2nd-4th) are ELIMINATED — not in any table", () => {
     const tables = generateFinalsRound6(semiRound);
     const allIds = tables.flatMap((t) => t.playerIds);
     // Challenger C 2nd-4th
@@ -234,19 +248,34 @@ describe("generateFinalsRound6", () => {
     expect(allIds).not.toContain("16");
   });
 
-  it("8 unique players across both redemption tables, no overlap", () => {
+  it("10 unique players across all 3 tables, no overlap", () => {
     const tables = generateFinalsRound6(semiRound);
     const allIds = tables.flatMap((t) => t.playerIds);
-    expect(allIds).toHaveLength(8);
-    expect(new Set(allIds).size).toBe(8);
+    expect(allIds).toHaveLength(10);
+    expect(new Set(allIds).size).toBe(10);
   });
 
-  it("tables start empty and not complete", () => {
+  it("all 6 Elite losers appear across the 2 Lower Finals", () => {
     const tables = generateFinalsRound6(semiRound);
-    tables.forEach((t) => {
+    const lfIds = new Set([...tables[1].playerIds, ...tables[2].playerIds]);
+    // Elite A losers: 4, 5, 8 and Elite B losers: 3, 6, 7
+    for (const id of ["3", "4", "5", "6", "7", "8"]) {
+      expect(lfIds.has(id)).toBe(true);
+    }
+  });
+
+  it("Lower Final tables start empty and not complete", () => {
+    const tables = generateFinalsRound6(semiRound);
+    for (const t of tables.slice(1)) {
       expect(t.results).toEqual([]);
       expect(t.isComplete).toBe(false);
-    });
+    }
+  });
+
+  it("bye table starts empty and not complete (reducer marks it complete)", () => {
+    const tables = generateFinalsRound6(semiRound);
+    expect(tables[0].results).toEqual([]);
+    expect(tables[0].isComplete).toBe(false);
   });
 
   it("works when results are in non-position order in the data", () => {
@@ -258,97 +287,71 @@ describe("generateFinalsRound6", () => {
       { playerId: "4", position: 2, vp: 9 },
     ];
     const tables = generateFinalsRound6(semiRound);
-    const r1 = tables[0].playerIds;
-    // Should still pick Elite A 2nd/3rd/4th by position field
-    expect(r1).toContain("4");
-    expect(r1).toContain("5");
-    expect(r1).toContain("8");
-    expect(r1).not.toContain("1");
+    // Bye table should still have Elite A winner (player 1)
+    expect(tables[0].playerIds).toContain("1");
+    // Player 1 should NOT be in any Lower Final
+    expect(tables[1].playerIds).not.toContain("1");
+    expect(tables[2].playerIds).not.toContain("1");
   });
 });
 
 describe("generateGrandFinal", () => {
-  let semiRound: Round;
   let redemptionRound: Round;
 
   beforeEach(() => {
-    // Semifinal round (R5) — same as above
-    const eliteA = makeCompletedTable(1, [
-      { playerId: "1", position: 1, vp: 12 },
-      { playerId: "4", position: 2, vp: 9 },
-      { playerId: "5", position: 3, vp: 6 },
-      { playerId: "8", position: 4, vp: 3 },
-    ]);
-    const eliteB = makeCompletedTable(2, [
-      { playerId: "2", position: 1, vp: 11 },
-      { playerId: "3", position: 2, vp: 8 },
-      { playerId: "6", position: 3, vp: 5 },
-      { playerId: "7", position: 4, vp: 2 },
-    ]);
-    const challC = makeCompletedTable(3, [
-      { playerId: "9", position: 1, vp: 10 },
-      { playerId: "10", position: 2, vp: 7 },
-      { playerId: "11", position: 3, vp: 4 },
-      { playerId: "12", position: 4, vp: 1 },
-    ]);
-    const challD = makeCompletedTable(4, [
-      { playerId: "13", position: 1, vp: 10 },
-      { playerId: "14", position: 2, vp: 7 },
-      { playerId: "15", position: 3, vp: 4 },
-      { playerId: "16", position: 4, vp: 1 },
-    ]);
-    semiRound = makeRound(6, "semifinal", [eliteA, eliteB, challC, challD]);
-
-    // Redemption round (R6)
-    // Redemption 1: players 4, 5, 8, 9 — player 9 wins (Challenger redemption!)
-    const redemption1 = makeCompletedTable(1, [
+    // Redemption round (3-table format):
+    //   Table 1 — Finalists bye: players 1 (Elite A winner) + 2 (Elite B winner)
+    //   Table 2 — Lower Final 1: player 9 (Chall C winner) + 3 Elite losers
+    //   Table 3 — Lower Final 2: player 13 (Chall D winner) + 3 Elite losers
+    const byeTable: Table = {
+      id: 1,
+      playerIds: ["1", "2"],
+      results: [],
+      isComplete: true, // auto-marked by reducer
+    };
+    const lf1 = makeCompletedTable(2, [
       { playerId: "9", position: 1, vp: 11 },
       { playerId: "4", position: 2, vp: 8 },
       { playerId: "5", position: 3, vp: 5 },
       { playerId: "8", position: 4, vp: 2 },
     ]);
-    // Redemption 2: players 3, 6, 7, 13 — player 3 wins (Elite redemption!)
-    const redemption2 = makeCompletedTable(2, [
+    const lf2 = makeCompletedTable(3, [
       { playerId: "3", position: 1, vp: 10 },
       { playerId: "6", position: 2, vp: 7 },
       { playerId: "7", position: 3, vp: 4 },
       { playerId: "13", position: 4, vp: 1 },
     ]);
-    redemptionRound = makeRound(7, "winners-final", [redemption1, redemption2]);
+    redemptionRound = makeRound(7, "winners-final", [byeTable, lf1, lf2]);
   });
 
   it("produces exactly 1 table with 4 players", () => {
-    const table = generateGrandFinal(semiRound, redemptionRound);
+    const table = generateGrandFinal(redemptionRound);
     expect(table.playerIds).toHaveLength(4);
   });
 
-  it("includes Elite A winner (1st from semifinal table 0)", () => {
-    const table = generateGrandFinal(semiRound, redemptionRound);
-    expect(table.playerIds).toContain("1"); // player 1 won Elite A
+  it("includes Finalists from bye table (Elite A + Elite B winners)", () => {
+    const table = generateGrandFinal(redemptionRound);
+    expect(table.playerIds).toContain("1"); // Elite A winner
+    expect(table.playerIds).toContain("2"); // Elite B winner
   });
 
-  it("includes Elite B winner (1st from semifinal table 1)", () => {
-    const table = generateGrandFinal(semiRound, redemptionRound);
-    expect(table.playerIds).toContain("2"); // player 2 won Elite B
+  it("includes Lower Final 1 winner", () => {
+    const table = generateGrandFinal(redemptionRound);
+    expect(table.playerIds).toContain("9"); // LF1 winner
   });
 
-  it("includes Redemption 1 winner", () => {
-    const table = generateGrandFinal(semiRound, redemptionRound);
-    expect(table.playerIds).toContain("9"); // player 9 won Redemption 1
+  it("includes Lower Final 2 winner", () => {
+    const table = generateGrandFinal(redemptionRound);
+    expect(table.playerIds).toContain("3"); // LF2 winner
   });
 
-  it("includes Redemption 2 winner", () => {
-    const table = generateGrandFinal(semiRound, redemptionRound);
-    expect(table.playerIds).toContain("3"); // player 3 won Redemption 2
-  });
-
-  it("Grand Final has exactly {Elite A winner, Elite B winner, Redem1 winner, Redem2 winner}", () => {
-    const table = generateGrandFinal(semiRound, redemptionRound);
+  it("Grand Final has exactly {Finalist1, Finalist2, LF1 winner, LF2 winner}", () => {
+    const table = generateGrandFinal(redemptionRound);
     expect(new Set(table.playerIds)).toEqual(new Set(["1", "2", "9", "3"]));
   });
 
-  it("does NOT include any redemption losers", () => {
-    const table = generateGrandFinal(semiRound, redemptionRound);
+  it("does NOT include any Lower Final losers", () => {
+    const table = generateGrandFinal(redemptionRound);
     expect(table.playerIds).not.toContain("4");
     expect(table.playerIds).not.toContain("5");
     expect(table.playerIds).not.toContain("6");
@@ -358,7 +361,7 @@ describe("generateGrandFinal", () => {
   });
 
   it("table starts empty and not complete", () => {
-    const table = generateGrandFinal(semiRound, redemptionRound);
+    const table = generateGrandFinal(redemptionRound);
     expect(table.results).toEqual([]);
     expect(table.isComplete).toBe(false);
   });
@@ -406,20 +409,29 @@ describe("getFinalStandings", () => {
     state.rounds.push(semiRound);
     state = applyResults(state, 0);
 
-    // R6: Redemption Round
-    const redemption1 = makeCompletedTable(1, [
+    // R6: Redemption Round (3-table format)
+    // Table 1 — Finalists bye: Elite A winner (1) + Elite B winner (2)
+    const byeTable: Table = {
+      id: 1,
+      playerIds: ["1", "2"],
+      results: [],
+      isComplete: true,
+    };
+    // Table 2 — Lower Final 1: Chall C winner (9) + 3 Elite losers
+    const lf1 = makeCompletedTable(2, [
       { playerId: "9", position: 1, vp: 11 },
       { playerId: "4", position: 2, vp: 8 },
       { playerId: "5", position: 3, vp: 5 },
       { playerId: "8", position: 4, vp: 2 },
     ]);
-    const redemption2 = makeCompletedTable(2, [
+    // Table 3 — Lower Final 2: Chall D winner (13) + 3 Elite losers
+    const lf2 = makeCompletedTable(3, [
       { playerId: "3", position: 1, vp: 10 },
       { playerId: "6", position: 2, vp: 7 },
       { playerId: "7", position: 3, vp: 4 },
       { playerId: "13", position: 4, vp: 1 },
     ]);
-    const redemptionRound = makeRound(7, "winners-final", [redemption1, redemption2]);
+    const redemptionRound = makeRound(7, "winners-final", [byeTable, lf1, lf2]);
 
     state.rounds.push(redemptionRound);
     state = applyResults(state, 1);
@@ -586,38 +598,60 @@ describe("end-to-end bracket flow", () => {
 
     const semiRound = makeRound(6, "semifinal", semiTables);
 
-    // 2. Generate Redemption
+    // 2. Generate Redemption (3-table format)
     const redemptionTables = generateFinalsRound6(semiRound);
-    expect(redemptionTables).toHaveLength(2);
+    expect(redemptionTables).toHaveLength(3);
 
-    // Verify redemption composition
-    expect(new Set(redemptionTables[0].playerIds)).toEqual(new Set(["4", "5", "8", "9"]));
-    expect(new Set(redemptionTables[1].playerIds)).toEqual(new Set(["3", "6", "7", "13"]));
+    // Table 1 — Finalists bye: Elite A winner (1) + Elite B winner (2)
+    expect(redemptionTables[0].playerIds).toHaveLength(2);
+    expect(new Set(redemptionTables[0].playerIds)).toEqual(new Set(["1", "2"]));
 
-    // Simulate R6 results
-    redemptionTables[0].results = [
-      { playerId: "4", position: 1, vp: 11 },
-      { playerId: "9", position: 2, vp: 8 },
-      { playerId: "5", position: 3, vp: 5 },
-      { playerId: "8", position: 4, vp: 2 },
-    ];
+    // Table 2 — Lower Final 1: Chall C winner (9) + 3 Elite losers
+    expect(redemptionTables[1].playerIds).toHaveLength(4);
+    expect(redemptionTables[1].playerIds).toContain("9");
+
+    // Table 3 — Lower Final 2: Chall D winner (13) + 3 Elite losers
+    expect(redemptionTables[2].playerIds).toHaveLength(4);
+    expect(redemptionTables[2].playerIds).toContain("13");
+
+    // Auto-mark bye table as complete (as reducer would do)
     redemptionTables[0].isComplete = true;
 
+    // Simulate R6 Lower Final results
+    // LF1: player 4 wins (from Elite losers in LF1)
+    // We need to use actual playerIds from the generated tables since Elite loser distribution is random
+    const lf1Ids = redemptionTables[1].playerIds;
+    const lf1EliteLosers = lf1Ids.filter((id) => id !== "9");
     redemptionTables[1].results = [
-      { playerId: "6", position: 1, vp: 10 },
-      { playerId: "3", position: 2, vp: 7 },
-      { playerId: "13", position: 3, vp: 4 },
-      { playerId: "7", position: 4, vp: 1 },
+      { playerId: lf1EliteLosers[0], position: 1, vp: 11 },
+      { playerId: "9", position: 2, vp: 8 },
+      { playerId: lf1EliteLosers[1], position: 3, vp: 5 },
+      { playerId: lf1EliteLosers[2], position: 4, vp: 2 },
     ];
     redemptionTables[1].isComplete = true;
+
+    // LF2: player 13 wins (Challenger D winner)
+    const lf2Ids = redemptionTables[2].playerIds;
+    const lf2EliteLosers = lf2Ids.filter((id) => id !== "13");
+    redemptionTables[2].results = [
+      { playerId: "13", position: 1, vp: 10 },
+      { playerId: lf2EliteLosers[0], position: 2, vp: 7 },
+      { playerId: lf2EliteLosers[1], position: 3, vp: 4 },
+      { playerId: lf2EliteLosers[2], position: 4, vp: 1 },
+    ];
+    redemptionTables[2].isComplete = true;
 
     const redemptionRound = makeRound(7, "winners-final", redemptionTables);
 
     // 3. Generate Grand Final
-    const grandFinalTable = generateGrandFinal(semiRound, redemptionRound);
+    const grandFinalTable = generateGrandFinal(redemptionRound);
 
-    // Elite A winner (1) + Elite B winner (2) + Redem1 winner (4) + Redem2 winner (6)
-    expect(new Set(grandFinalTable.playerIds)).toEqual(new Set(["1", "2", "4", "6"]));
+    // Finalists (1, 2) + LF1 winner + LF2 winner (13)
+    expect(grandFinalTable.playerIds).toContain("1");
+    expect(grandFinalTable.playerIds).toContain("2");
+    expect(grandFinalTable.playerIds).toContain(lf1EliteLosers[0]); // LF1 winner
+    expect(grandFinalTable.playerIds).toContain("13"); // LF2 winner
+    expect(grandFinalTable.playerIds).toHaveLength(4);
   });
 
   it("lower seed can reach Grand Final via redemption path", () => {
@@ -661,30 +695,44 @@ describe("end-to-end bracket flow", () => {
     const semiRound = makeRound(6, "semifinal", semiTables);
     const redemptionTables = generateFinalsRound6(semiRound);
 
-    // Challenger C winner (12) goes to Redemption 1
-    expect(redemptionTables[0].playerIds).toContain("12");
-    // Challenger D winner (16) goes to Redemption 2
-    expect(redemptionTables[1].playerIds).toContain("16");
+    // 3-table format: bye (2 players) + LF1 (4) + LF2 (4)
+    expect(redemptionTables).toHaveLength(3);
 
-    // Player 12 (lowest seed in Redemption 1) WINS redemption
-    redemptionTables[0].results = [
-      { playerId: "12", position: 1, vp: 14 },
-      { playerId: "5", position: 2, vp: 8 },
-      { playerId: "4", position: 3, vp: 5 },
-      { playerId: "8", position: 4, vp: 2 },
-    ];
+    // Bye table has Elite A winner (1) + Elite B winner (2)
+    expect(new Set(redemptionTables[0].playerIds)).toEqual(new Set(["1", "2"]));
+
+    // Challenger C winner (12) goes to LF1
+    expect(redemptionTables[1].playerIds).toContain("12");
+    // Challenger D winner (16) goes to LF2
+    expect(redemptionTables[2].playerIds).toContain("16");
+
+    // Auto-mark bye table as complete
     redemptionTables[0].isComplete = true;
 
+    // Player 12 (lowest seed in LF1) WINS Lower Final 1
+    const lf1Ids = redemptionTables[1].playerIds;
+    const lf1Others = lf1Ids.filter((id) => id !== "12");
     redemptionTables[1].results = [
-      { playerId: "16", position: 1, vp: 13 },
-      { playerId: "7", position: 2, vp: 7 },
-      { playerId: "3", position: 3, vp: 4 },
-      { playerId: "6", position: 4, vp: 1 },
+      { playerId: "12", position: 1, vp: 14 },
+      { playerId: lf1Others[0], position: 2, vp: 8 },
+      { playerId: lf1Others[1], position: 3, vp: 5 },
+      { playerId: lf1Others[2], position: 4, vp: 2 },
     ];
     redemptionTables[1].isComplete = true;
 
+    // Player 16 WINS Lower Final 2
+    const lf2Ids = redemptionTables[2].playerIds;
+    const lf2Others = lf2Ids.filter((id) => id !== "16");
+    redemptionTables[2].results = [
+      { playerId: "16", position: 1, vp: 13 },
+      { playerId: lf2Others[0], position: 2, vp: 7 },
+      { playerId: lf2Others[1], position: 3, vp: 4 },
+      { playerId: lf2Others[2], position: 4, vp: 1 },
+    ];
+    redemptionTables[2].isComplete = true;
+
     const redemptionRound = makeRound(7, "winners-final", redemptionTables);
-    const grandFinalTable = generateGrandFinal(semiRound, redemptionRound);
+    const grandFinalTable = generateGrandFinal(redemptionRound);
 
     // Seeds 12 and 16 (bottom challengers) made it to Grand Final!
     expect(grandFinalTable.playerIds).toContain("12");

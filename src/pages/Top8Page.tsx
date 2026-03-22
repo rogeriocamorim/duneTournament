@@ -11,7 +11,7 @@ import { Trophy, Crown, Swords, ChevronRight, BarChart3, FlaskConical } from "lu
 
 const ELITE_TABLE_LABELS = ["Elite Table A", "Elite Table B"];
 const CHALLENGER_TABLE_LABELS = ["Challenger Table C", "Challenger Table D"];
-const REDEMPTION_LABELS = ["Trial of Gom Jabbar", "Water of Life"];
+const LOWER_FINAL_LABELS = ["Lower Final 1 — Trial of Gom Jabbar", "Lower Final 2 — Water of Life"];
 
 interface Top8PageProps {
   state: TournamentState;
@@ -312,20 +312,40 @@ export function Top8Page({
             </>
           )}
 
-          {/* ── Redemption Round ── */}
+          {/* ── Redemption Round (3 tables: Finalists bye + 2 Lower Finals) ── */}
           {currentRound.type === "winners-final" && (
             <>
               <h2 className="text-display text-sm text-center text-sand-dark mb-4">
                 Round {currentRound.number} — Redemption Round
               </h2>
+
+              {/* Finalists Bye Table */}
+              <div className="stone-card p-4 mb-6 border border-spice/30">
+                <p className="text-xs text-center text-spice uppercase tracking-widest mb-3">
+                  Finalists — Direct to Grand Final
+                </p>
+                <div className="flex justify-center gap-4">
+                  {currentRound.tables[0]?.playerIds.map((pid) => {
+                    const player = state.players.find((p) => p.id === pid);
+                    return (
+                      <div key={pid} className="flex items-center gap-2 px-4 py-2 glass-morphism rounded">
+                        <Crown size={14} className="text-spice" />
+                        <span className="text-sand text-sm font-semibold">{player?.name ?? pid}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Lower Finals */}
               <DramaticReveal
                 roundKey={`redemption-r${currentRound.number}`}
                 enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
-                labels={REDEMPTION_LABELS}
-                items={currentRound.tables.map((table, index) => (
+                labels={LOWER_FINAL_LABELS}
+                items={currentRound.tables.slice(1).map((table, index) => (
                   <div key={`r${currentRound.number}-t${table.id}`}>
                     <p className="text-xs text-center text-spice uppercase tracking-widest mb-2">
-                      {REDEMPTION_LABELS[index] ?? `Redemption ${index + 1}`}
+                      {LOWER_FINAL_LABELS[index] ?? `Lower Final ${index + 1}`}
                     </p>
                     <TableCard
                       table={table}
