@@ -372,8 +372,9 @@ export function Top8Page({
                 roundKey={`grand-final-r${currentRound.number}`}
                 enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
                 labels={["Grand Final"]}
+                gridClass="flex justify-center"
                 items={currentRound.tables.map((table, index) => (
-                  <div key={`r${currentRound.number}-t${table.id}`}>
+                  <div key={`r${currentRound.number}-t${table.id}`} className="w-full max-w-xl">
                     <TableCard
                       table={table}
                       players={state.players}
