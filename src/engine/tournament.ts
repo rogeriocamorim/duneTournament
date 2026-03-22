@@ -252,8 +252,8 @@ export function getTopCut(state: TournamentState): Player[] {
  * Generate semifinal tables for Round 6 (16 players → 4 tables of 4):
  *   Elite Table A:      Seeds 1, 4, 5, 8
  *   Elite Table B:      Seeds 2, 3, 6, 7
- *   Challenger Table C: Seeds 9, 10, 11, 12
- *   Challenger Table D: Seeds 13, 14, 15, 16
+ *   Challenger Table C: Seeds 9, 12, 13, 16
+ *   Challenger Table D: Seeds 10, 11, 14, 15
  */
 export function generateSemifinals(state: TournamentState): Table[] {
   const top16 = getTopCut(state);
@@ -274,17 +274,17 @@ export function generateSemifinals(state: TournamentState): Table[] {
       results: [],
       isComplete: false,
     },
-    // Challenger Table C: seeds 9, 10, 11, 12
+    // Challenger Table C: seeds 9, 12, 13, 16
     {
       id: 3,
-      playerIds: [top16[8].id, top16[9].id, top16[10].id, top16[11].id],
+      playerIds: [top16[8].id, top16[11].id, top16[12].id, top16[15].id],
       results: [],
       isComplete: false,
     },
-    // Challenger Table D: seeds 13, 14, 15, 16
+    // Challenger Table D: seeds 10, 11, 14, 15
     {
       id: 4,
-      playerIds: [top16[12].id, top16[13].id, top16[14].id, top16[15].id],
+      playerIds: [top16[9].id, top16[10].id, top16[13].id, top16[14].id],
       results: [],
       isComplete: false,
     },

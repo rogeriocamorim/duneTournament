@@ -99,16 +99,16 @@ describe("generateSemifinals", () => {
     expect(eliteB).toEqual(["2", "3", "6", "7"]);
   });
 
-  it("assigns Challenger Table C seeds 9, 10, 11, 12", () => {
+  it("assigns Challenger Table C seeds 9, 12, 13, 16", () => {
     const tables = generateSemifinals(state);
     const challC = tables[2].playerIds;
-    expect(challC).toEqual(["9", "10", "11", "12"]);
+    expect(challC).toEqual(["9", "12", "13", "16"]);
   });
 
-  it("assigns Challenger Table D seeds 13, 14, 15, 16", () => {
+  it("assigns Challenger Table D seeds 10, 11, 14, 15", () => {
     const tables = generateSemifinals(state);
     const challD = tables[3].playerIds;
-    expect(challD).toEqual(["13", "14", "15", "16"]);
+    expect(challD).toEqual(["10", "11", "14", "15"]);
   });
 
   it("all 16 unique players are assigned across the 4 tables", () => {
