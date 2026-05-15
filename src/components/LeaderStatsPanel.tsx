@@ -27,16 +27,17 @@ export function LeaderStatsPanel({ rounds }: LeaderStatsPanelProps) {
   const [phase, setPhase] = useState<StatsPhase>("all");
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
 
-  // Filter completed rounds visible for the current phase
+  // Filter rounds that have at least one completed table for the current phase
   const phaseRounds = rounds.filter((r) => {
-    if (!r.isComplete) return false;
+    const hasCompletedTable = r.tables.some((t) => t.isComplete);
+    if (!hasCompletedTable) return false;
     if (phase === "qualifying") return r.type === "qualifying";
     if (phase === "bracket") return BRACKET_TYPES.has(r.type);
     return true;
   });
 
-  const hasQualifying = rounds.some((r) => r.isComplete && r.type === "qualifying");
-  const hasBracket = rounds.some((r) => r.isComplete && BRACKET_TYPES.has(r.type));
+  const hasQualifying = rounds.some((r) => r.tables.some((t) => t.isComplete) && r.type === "qualifying");
+  const hasBracket = rounds.some((r) => r.tables.some((t) => t.isComplete) && BRACKET_TYPES.has(r.type));
 
   // Reset round selection when phase changes and round is out of scope
   const validRoundNums = new Set(phaseRounds.map((r) => r.number));

@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import type { Table, TableResult, Player } from "../engine/types";
 import { LEADER_LIST } from "../engine/types";
 import { Pencil, AlertTriangle } from "lucide-react";
+import { AnimatePresence as AP } from "motion/react";
+import { PasswordGate, isSessionAuthed } from "./PasswordGate";
 
 interface TableCardProps {
   table: Table;
@@ -47,43 +49,44 @@ export function TableCard({
   availableLeaders,
 }: TableCardProps) {
   const [editing, setEditing] = useState(!table.isComplete);
-  const [results, setResults] = useState<Record<string, { position: number; vp: number; leader: string }>>(
+  const [results, setResults] = useState<Record<string, { position: number; vp: number; leader: string; seatPosition: number; pickOrder: number }>>(
     () => {
       if (table.isComplete) {
-        const map: Record<string, { position: number; vp: number; leader: string }> = {};
+        const map: Record<string, { position: number; vp: number; leader: string; seatPosition: number; pickOrder: number }> = {};
         for (const r of table.results) {
-          map[r.playerId] = { position: r.position, vp: r.vp, leader: r.leader || "" };
+          map[r.playerId] = { position: r.position, vp: r.vp, leader: r.leader || "", seatPosition: r.seatPosition ?? 0, pickOrder: r.pickOrder ?? 0 };
         }
         return map;
       }
-      const map: Record<string, { position: number; vp: number; leader: string }> = {};
+      const map: Record<string, { position: number; vp: number; leader: string; seatPosition: number; pickOrder: number }> = {};
       for (const id of table.playerIds) {
-        map[id] = { position: 0, vp: 0, leader: "" };
+        map[id] = { position: 0, vp: 0, leader: "", seatPosition: 0, pickOrder: 0 };
       }
       return map;
     }
   );
 
   const [error, setError] = useState<string | null>(null);
-  const [wasComplete, setWasComplete] = useState(table.isComplete);
+  const [showPasswordGate, setShowPasswordGate] = useState(false);
+  const [prevIsComplete, setPrevIsComplete] = useState(table.isComplete);
 
-  // Sync local state when table is completed externally (e.g. auto-fill).
-  // Only triggers when table.isComplete transitions from false → true,
-  // NOT when the user clicks the edit pencil on an already-complete table.
+  // Sync only on external completion (auto-fill), never when user clicked edit pencil
   useEffect(() => {
-    if (table.isComplete && !wasComplete) {
-      setWasComplete(true);
-      setEditing(false);
-      const map: Record<string, { position: number; vp: number; leader: string }> = {};
-      for (const r of table.results) {
-        map[r.playerId] = { position: r.position, vp: r.vp, leader: r.leader || "" };
+    if (table.isComplete && !prevIsComplete) {
+      setPrevIsComplete(true);
+      if (!editing) {
+        const map: Record<string, { position: number; vp: number; leader: string; seatPosition: number; pickOrder: number }> = {};
+        for (const r of table.results) {
+          map[r.playerId] = { position: r.position, vp: r.vp, leader: r.leader || "", seatPosition: r.seatPosition ?? 0, pickOrder: r.pickOrder ?? 0 };
+        }
+        setResults(map);
       }
-      setResults(map);
     }
-    if (!table.isComplete && wasComplete) {
-      setWasComplete(false);
+    if (!table.isComplete && prevIsComplete) {
+      setPrevIsComplete(false);
+      setEditing(true);
     }
-  }, [table.isComplete, table.results, wasComplete]);
+  }, [table.isComplete, table.results, prevIsComplete, editing]);
 
   const tablePlayers = table.playerIds
     .map((id) => players.find((p) => p.id === id))
@@ -109,6 +112,20 @@ export function TableCard({
     setResults((prev) => ({
       ...prev,
       [playerId]: { ...prev[playerId], leader },
+    }));
+  };
+
+  const handleSeatPositionChange = (playerId: string, seatPosition: number) => {
+    setResults((prev) => ({
+      ...prev,
+      [playerId]: { ...prev[playerId], seatPosition },
+    }));
+  };
+
+  const handlePickOrderChange = (playerId: string, pickOrder: number) => {
+    setResults((prev) => ({
+      ...prev,
+      [playerId]: { ...prev[playerId], pickOrder },
     }));
   };
 
@@ -160,11 +177,13 @@ export function TableCard({
 
     setError(null);
     const tableResults: TableResult[] = entries.map(
-      ([playerId, { position, vp, leader }]) => ({
+      ([playerId, { position, vp, leader, seatPosition, pickOrder }]) => ({
         playerId,
         position,
         vp,
         leader: leader || undefined,
+        seatPosition: seatPosition || undefined,
+        pickOrder: pickOrder || undefined,
       })
     );
 
@@ -192,7 +211,13 @@ export function TableCard({
             </span>
             {allowEdit && (
               <button
-                onClick={() => setEditing(true)}
+                onClick={() => {
+                  if (isSessionAuthed()) {
+                    setEditing(true);
+                  } else {
+                    setShowPasswordGate(true);
+                  }
+                }}
                 className="text-sand-dark hover:text-spice transition-colors p-1"
                 title="Edit results"
               >
@@ -208,10 +233,8 @@ export function TableCard({
         {tablePlayers.map((player) => {
           const result = results[player.id];
           return (
-            <div
-              key={player.id}
-              className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0"
-            >
+            <div key={player.id} className="border-b border-white/5 last:border-0 pb-1">
+              <div className="flex items-center gap-3 py-2">
               {/* Position selector */}
               {editing ? (
                 <select
@@ -316,6 +339,41 @@ export function TableCard({
                   +{[6, 3, 2, 1][result.position - 1] || 0}
                 </span>
               )}
+              </div>{/* end inner flex row */}
+
+            {/* Seat Position + Pick Order (editing only, compact row) */}
+            {editing && (
+              <div className="flex items-center gap-3 pl-16 pb-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-sand-dark uppercase tracking-wider">Seat</span>
+                  <select
+                    value={result?.seatPosition || 0}
+                    onChange={(e) => handleSeatPositionChange(player.id, parseInt(e.target.value))}
+                    className="bg-black/50 border border-white/10 text-sand text-xs px-1 py-0.5 rounded-sm w-12 text-center"
+                  >
+                    <option value={0}>--</option>
+                    {[1,2,3,4].map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-sand-dark uppercase tracking-wider">Pick</span>
+                  <select
+                    value={result?.pickOrder || 0}
+                    onChange={(e) => handlePickOrderChange(player.id, parseInt(e.target.value))}
+                    className="bg-black/50 border border-white/10 text-sand text-xs px-1 py-0.5 rounded-sm w-12 text-center"
+                  >
+                    <option value={0}>--</option>
+                    {[1,2,3,4].map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+            {!editing && (result?.seatPosition || result?.pickOrder) ? (
+              <div className="flex gap-3 pl-16 pb-1">
+                {result?.seatPosition ? <span className="text-xs text-sand-dark">Seat {result.seatPosition}</span> : null}
+                {result?.pickOrder ? <span className="text-xs text-sand-dark">Pick {result.pickOrder}</span> : null}
+              </div>
+            ) : null}
             </div>
           );
         })}
@@ -342,12 +400,27 @@ export function TableCard({
       {/* Submit button */}
       {editing && (
         <button
-          onClick={handleSubmit}
+          onClick={() => {
+            if (!table.isComplete && !isSessionAuthed()) {
+              setShowPasswordGate(true);
+            } else {
+              handleSubmit();
+            }
+          }}
           className="btn-imperial-filled w-full mt-4 py-2 text-sm"
         >
           Confirm Results
         </button>
       )}
+      {/* Password gate */}
+      <AP>
+        {showPasswordGate && (
+          <PasswordGate
+            onUnlock={() => { setShowPasswordGate(false); setEditing(true); }}
+            onCancel={() => setShowPasswordGate(false)}
+          />
+        )}
+      </AP>
     </motion.div>
   );
 }

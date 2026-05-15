@@ -13,7 +13,6 @@ import {
   selectRoundLeaders,
   migrateLeaderNames,
   generateSwissPairing,
-  snakeDraftOrder,
   revertTableResults,
   backfillPlayerWins,
   getRoundsPlayed,
@@ -956,32 +955,6 @@ describe("migrateLeaderNames", () => {
 
 // ===== GOLF-STYLE PAIRING — SNAKE DRAFT + NO-REMATCH TESTS =====
 
-describe("snakeDraftOrder", () => {
-  it("produces correct snake-draft for 16 players / 4 tables", () => {
-    const order = snakeDraftOrder(16);
-    // Row 0 (L→R): ranks 0-3 → tables 0,1,2,3
-    // Row 1 (R→L): ranks 4-7 → tables 3,2,1,0
-    // Row 2 (L→R): ranks 8-11 → tables 0,1,2,3
-    // Row 3 (R→L): ranks 12-15 → tables 3,2,1,0
-    expect(order).toEqual([0,1,2,3, 3,2,1,0, 0,1,2,3, 3,2,1,0]);
-  });
-
-  it("produces correct snake-draft for 8 players / 2 tables", () => {
-    const order = snakeDraftOrder(8);
-    expect(order).toEqual([0,1, 1,0, 0,1, 1,0]);
-  });
-
-  it("each table gets exactly 4 players", () => {
-    const order = snakeDraftOrder(20);
-    const counts = new Map<number, number>();
-    for (const t of order) {
-      counts.set(t, (counts.get(t) ?? 0) + 1);
-    }
-    for (const [, count] of counts) {
-      expect(count).toBe(4);
-    }
-  });
-});
 
 describe("generateSwissPairing — golf mode", () => {
   function makeQualifyingState(playerCount: number): TournamentState {

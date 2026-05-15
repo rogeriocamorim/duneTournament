@@ -23,7 +23,7 @@ export function RegistrationPage({
   onStart,
   testMode,
 }: RegistrationPageProps) {
-  const canStart = players.length >= 4 && players.length % 4 === 0;
+  const canStart = players.length >= 8 && players.length % 8 === 0;
   const [showVideo, setShowVideo] = useState(false);
   const [testPlayerCount, setTestPlayerCount] = useState(20);
 
@@ -193,11 +193,11 @@ export function RegistrationPage({
             onClick={onStart}
             className="btn-imperial-filled text-lg py-4 px-12"
           >
-            Begin the Jihad
+            Enter the Colosseum
           </button>
           <p className="text-xs text-sand-dark mt-3 uppercase tracking-widest">
             {players.length} players &middot;{" "}
-            {players.length / 4} table{players.length / 4 > 1 ? "s" : ""} of 4
+            {players.length / 8} group{players.length / 8 > 1 ? "s" : ""} of 8
           </p>
         </motion.div>
       )}
@@ -210,7 +210,7 @@ export function RegistrationPage({
           className="text-center"
         >
           <p className="text-xs text-spice uppercase tracking-widest">
-            Add {4 - (players.length % 4)} more player{4 - (players.length % 4) > 1 ? "s" : ""} to fill all tables of 4
+            Add {8 - (players.length % 8)} more player{8 - (players.length % 8) > 1 ? "s" : ""} to fill all groups of 8
           </p>
         </motion.div>
       )}

@@ -2,19 +2,19 @@ import { useState, useCallback, useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useTournamentState } from "./hooks/useTournamentState";
 import { RegistrationPage } from "./pages/RegistrationPage";
+import { SpinnerWheelPage } from "./pages/SpinnerWheelPage";
+import { KnockoutRandomizer } from "./pages/KnockoutRandomizer";
 import { DashboardPage } from "./pages/DashboardPage";
 import { Top8Page } from "./pages/Top8Page";
 import { SpectatorPage } from "./pages/SpectatorPage";
 import { GuildNavigator } from "./components/GuildNavigator";
 import { ShareModal } from "./components/ShareModal";
 import { SandstormTransition } from "./components/animations/SandstormTransition";
-import { verifyResetPassphrase } from "./engine/types";
 import {
   RotateCcw,
   Database,
   Sparkles,
   Share2,
-  Lock,
   FlaskConical,
 } from "lucide-react";
 
@@ -36,10 +36,11 @@ function App() {
     addPlayer,
     removePlayer,
     startTournament,
-    generateRound,
+    setGroupAssignments,
     submitTableResults,
     batchSubmitTableResults,
     startTop8,
+    confirmKnockoutDraw,
     generateTop8Round,
     importState,
     exportState,
@@ -55,9 +56,6 @@ function App() {
   const [sharingInProgress, setSharingInProgress] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [resetPassphrase, setResetPassphrase] = useState("");
-  const [resetError, setResetError] = useState(false);
-  const [resetVerifying, setResetVerifying] = useState(false);
 
   // ===== ESCAPE KEY HANDLER =====
   useEffect(() => {
@@ -88,30 +86,14 @@ function App() {
   const handleStart = useCallback(() => {
     transitionTo(() => {
       startTournament();
-      generateRound();
     });
-  }, [transitionTo, startTournament, generateRound]);
+  }, [transitionTo, startTournament]);
 
   const handleStartTop8 = useCallback(() => {
     transitionTo(() => {
       startTop8();
     });
   }, [transitionTo, startTop8]);
-
-  const handleReset = useCallback(async () => {
-    setResetVerifying(true);
-    setResetError(false);
-    const valid = await verifyResetPassphrase(resetPassphrase);
-    if (valid) {
-      resetTournament();
-      setShowResetConfirm(false);
-      setResetPassphrase("");
-      setResetError(false);
-    } else {
-      setResetError(true);
-    }
-    setResetVerifying(false);
-  }, [resetTournament, resetPassphrase]);
 
   const handleShare = useCallback(async () => {
     setSharingInProgress(true);
@@ -216,6 +198,22 @@ function App() {
           </motion.div>
         )}
 
+        {state.phase === "group-draw" && (
+          <motion.div
+            key="group-draw"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <SpinnerWheelPage
+              players={state.players}
+              onConfirm={(assignments) => {
+                transitionTo(() => setGroupAssignments(assignments));
+              }}
+            />
+          </motion.div>
+        )}
+
         {state.phase === "qualifying" && (
           <motion.div
             key="qualifying"
@@ -225,12 +223,29 @@ function App() {
           >
             <DashboardPage
               state={state}
-              onGenerateRound={generateRound}
               onSubmitResults={submitTableResults}
               onBatchSubmitResults={batchSubmitTableResults}
               onStartTop8={handleStartTop8}
-              dramaticReveal={state.settings.dramaticReveal}
               testMode={state.settings.testMode}
+            />
+          </motion.div>
+        )}
+
+        {state.phase === "knockout-draw" && (
+          <motion.div key="knockout-draw" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <KnockoutRandomizer
+              players={state.players}
+              rounds={state.rounds}
+              onConfirm={(sf1a, sf1b, elimA, elimB) => {
+                transitionTo(() => {
+                  confirmKnockoutDraw(
+                    sf1a.map((p) => p.id),
+                    sf1b.map((p) => p.id),
+                    elimA.map((p) => p.id),
+                    elimB.map((p) => p.id)
+                  );
+                });
+              }}
             />
           </motion.div>
         )}
@@ -270,7 +285,7 @@ function App() {
         shareUrl={shareUrl}
       />
 
-      {/* Reset Confirmation with Passphrase */}
+      {/* Reset Confirmation */}
       <AnimatePresence>
         {showResetConfirm && (
           <>
@@ -279,11 +294,7 @@ function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => {
-                setShowResetConfirm(false);
-                setResetPassphrase("");
-                setResetError(false);
-              }}
+              onClick={() => setShowResetConfirm(false)}
             />
             <motion.div
               className="fixed inset-0 flex items-center justify-center z-50 p-4"
@@ -292,62 +303,30 @@ function App() {
               exit={{ opacity: 0, scale: 0.9 }}
             >
               <div className="glass-morphism-strong rounded-sm p-8 max-w-sm w-full text-center">
-                <Lock size={32} className="text-blood mx-auto mb-4" />
+                <RotateCcw size={32} className="text-blood mx-auto mb-4" />
                 <h3 className="text-display text-lg text-spice mb-2">
                   Reset Tournament?
                 </h3>
                 <p className="text-sm text-sand-dark mb-6">
-                  This will destroy all tournament data. Enter the passphrase to confirm.
+                  This will permanently destroy all tournament data. Are you sure?
                 </p>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleReset();
-                  }}
-                >
-                  <input
-                    type="password"
-                    value={resetPassphrase}
-                    onChange={(e) => {
-                      setResetPassphrase(e.target.value);
-                      setResetError(false);
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={() => {
+                      resetTournament();
+                      setShowResetConfirm(false);
                     }}
-                    placeholder="Enter passphrase..."
-                    className={`input-imperial w-full mb-3 text-center ${
-                      resetError ? "border-blood/60" : ""
-                    }`}
-                    autoFocus
-                  />
-                  {resetError && (
-                    <p className="text-blood text-xs mb-3 uppercase tracking-wider">
-                      Wrong passphrase
-                    </p>
-                  )}
-                  <div className="flex gap-3 justify-center">
-                    <button
-                      type="submit"
-                      disabled={!resetPassphrase || resetVerifying}
-                      className={`px-6 py-2 bg-blood text-white uppercase tracking-widest text-sm font-bold transition-colors ${
-                        !resetPassphrase || resetVerifying
-                          ? "opacity-40 cursor-not-allowed"
-                          : "cursor-pointer hover:bg-red-700"
-                      }`}
-                    >
-                      {resetVerifying ? "Verifying..." : "Destroy"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowResetConfirm(false);
-                        setResetPassphrase("");
-                        setResetError(false);
-                      }}
-                      className="btn-imperial text-sm py-2"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
+                    className="px-6 py-2 bg-blood text-white uppercase tracking-widest text-sm font-bold hover:bg-red-700 transition-colors cursor-pointer"
+                  >
+                    Destroy
+                  </button>
+                  <button
+                    onClick={() => setShowResetConfirm(false)}
+                    className="btn-imperial text-sm py-2"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </motion.div>
           </>

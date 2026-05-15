@@ -26,194 +26,78 @@ export function initializePlayerIds(players: Player[]): void {
 // ===== PAIRING ENGINE =====
 
 /**
- * Golf-style pairing: rank players by standings, then snake-draft across
- * tables so each table gets a mix of top, middle, and bottom players.
- * Anti-rematch backtracking ensures no two players meet twice where possible.
+ * Colosseum Fixed Group Schedule (64 players, 8 groups of 8).
  *
- * Snake-draft example (16 players, 4 tables):
- *   T1: ranks 1, 8, 9, 16
- *   T2: ranks 2, 7, 10, 15
- *   T3: ranks 3, 6, 11, 14
- *   T4: ranks 4, 5, 12, 13
+ * Each group has 8 players (P1–P8) seated across 4 rounds.
+ * The schedule guarantees no two players share a table more than twice.
+ *
+ * Round 1: [P1,P2,P3,P4] vs [P5,P6,P7,P8]
+ * Round 2: [P1,P2,P5,P6] vs [P3,P4,P7,P8]
+ * Round 3: [P1,P3,P5,P7] vs [P2,P4,P6,P8]
+ * Round 4: [P1,P4,P6,P7] vs [P2,P3,P5,P8]
+ */
+const GROUP_SCHEDULE: [number[], number[]][] = [
+  [[0,1,2,3],[4,5,6,7]],
+  [[0,1,4,5],[2,3,6,7]],
+  [[0,2,4,6],[1,3,5,7]],
+  [[0,3,5,6],[1,2,4,7]],
+];
+
+/** Assign players randomly into 8 groups of 8. */
+export function assignGroups(players: Player[]): Player[] {
+  const shuffled = [...players];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled.map((p, i) => ({ ...p, groupId: Math.floor(i / 8) }));
+}
+
+/**
+ * Generate tables for a given round using the fixed Colosseum group schedule.
+ * All 8 groups run simultaneously; each group contributes 2 tables per round.
+ * Total: 16 tables per round for 64 players.
  */
 export function generateSwissPairing(state: TournamentState): Table[] {
-  const players = [...state.players];
+  const roundIndex = state.currentRound; // 0-based, rounds 0-3
+  const schedule = GROUP_SCHEDULE[roundIndex % GROUP_SCHEDULE.length];
 
-  // Pre-compute VP Share % for sorting
-  const vpShareCache = new Map<string, number>();
-  for (const p of players) {
-    vpShareCache.set(p.id, getVpSharePct(p.id, state.rounds));
+  // Group players by groupId (0-7)
+  const groups = new Map<number, Player[]>();
+  for (const p of state.players) {
+    const gid = p.groupId ?? 0;
+    if (!groups.has(gid)) groups.set(gid, []);
+    groups.get(gid)!.push(p);
   }
 
-  // Sort by points (desc), wins (desc), VP (desc), vpSharePct (desc), efficiency (asc)
-  players.sort((a, b) => {
-    if (b.points !== a.points) return b.points - a.points;
-    if (b.wins !== a.wins) return b.wins - a.wins;
-    if (b.totalVP !== a.totalVP) return b.totalVP - a.totalVP;
-    const aShare = vpShareCache.get(a.id) ?? 0;
-    const bShare = vpShareCache.get(b.id) ?? 0;
-    if (bShare !== aShare) return bShare - aShare;
-    return a.efficiency - b.efficiency;
-  });
+  const tables: Table[] = [];
+  let tableId = 1;
 
-  const playerIds = players.map((p) => p.id);
-  const playerMap = new Map(state.players.map((p) => [p.id, p]));
+  // Sort groups so output is deterministic
+  const sortedGroupIds = [...groups.keys()].sort((a, b) => a - b);
 
-  // Try to create valid pairings with golf-style anti-repeat logic
-  const validPods = createGolfPods(playerIds, playerMap);
+  for (const gid of sortedGroupIds) {
+    const groupPlayers = groups.get(gid)!;
+    // Sort within group by their registration order (stable by id)
+    groupPlayers.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
 
-  return validPods.map((pod, index) => ({
-    id: index + 1,
-    playerIds: pod,
-    results: [],
-    isComplete: false,
-  }));
-}
-
-/**
- * Compute the snake-draft preferred table index for each rank position.
- * Alternates direction each row of T assignments:
- *   Row 0 (left→right): ranks 0..T-1 → tables 0..T-1
- *   Row 1 (right→left): ranks T..2T-1 → tables T-1..0
- *   Row 2 (left→right): ranks 2T..3T-1 → tables 0..T-1
- *   Row 3 (right→left): ranks 3T..4T-1 → tables T-1..0
- */
-export function snakeDraftOrder(playerCount: number): number[] {
-  const numTables = playerCount / 4;
-  const preferred: number[] = [];
-  for (let i = 0; i < playerCount; i++) {
-    const row = Math.floor(i / numTables);
-    const col = i % numTables;
-    const tableIdx = row % 2 === 0 ? col : numTables - 1 - col;
-    preferred.push(tableIdx);
-  }
-  return preferred;
-}
-
-/** Maximum backtracking iterations before falling back to greedy. */
-const MAX_BACKTRACK_ITERATIONS = 100_000;
-
-/**
- * Golf-style anti-repeat pairing: distributes players across tables using
- * snake-draft for skill balance, with backtracking to avoid rematches.
- *
- * The solver tries each player's preferred (snake-draft) table first,
- * then falls back to other tables. This biases toward balanced tables
- * while still guaranteeing no rematches when possible.
- *
- * Falls back to greedy conflict-minimization if no valid assignment exists
- * (e.g., too few players relative to rounds played).
- *
- * Player count MUST be divisible by 4 — all tables seat exactly 4.
- */
-function createGolfPods(
-  sortedIds: string[],
-  playerMap: Map<string, Player>
-): string[][] {
-  const count = sortedIds.length;
-  const numTables = count / 4;
-
-  // Build opponent sets for O(1) lookup
-  const opponentSets = new Map<string, Set<string>>();
-  for (const id of sortedIds) {
-    const p = playerMap.get(id)!;
-    opponentSets.set(id, new Set(p.opponents));
-  }
-
-  // Compute preferred table for each player rank via snake draft
-  const preferredTable = snakeDraftOrder(count);
-
-  // ── Backtracking solver ──
-  // Process players in rank order. For each player, try their preferred
-  // (snake-draft) table first, then the remaining tables in order.
-  // This biases toward golf-style distribution while allowing swaps
-  // to resolve rematch conflicts.
-
-  const tables: string[][] = Array.from({ length: numTables }, () => []);
-  let iterations = 0;
-
-  function hasConflict(playerId: string, tableIdx: number): boolean {
-    const opps = opponentSets.get(playerId)!;
-    for (const otherId of tables[tableIdx]) {
-      if (opps.has(otherId)) return true;
-    }
-    return false;
-  }
-
-  /**
-   * Build table-try order: preferred table first, then the rest in order.
-   */
-  function tableOrder(playerIdx: number): number[] {
-    const pref = preferredTable[playerIdx];
-    const order = [pref];
-    for (let t = 0; t < numTables; t++) {
-      if (t !== pref) order.push(t);
-    }
-    return order;
-  }
-
-  function solve(playerIdx: number): boolean {
-    if (playerIdx === sortedIds.length) return true;
-    if (++iterations > MAX_BACKTRACK_ITERATIONS) return false;
-
-    const playerId = sortedIds[playerIdx];
-
-    for (const t of tableOrder(playerIdx)) {
-      if (tables[t].length >= 4) continue;
-      if (hasConflict(playerId, t)) continue;
-
-      tables[t].push(playerId);
-      if (solve(playerIdx + 1)) return true;
-      tables[t].pop();
-    }
-
-    return false;
-  }
-
-  if (solve(0)) {
-    return tables;
-  }
-
-  // ── Fallback: greedy conflict-minimization with golf preference ──
-  // Used when no conflict-free pairing exists (e.g., 8 players after 3+ rounds).
-  // Prefers the snake-draft table, breaking ties by fewest conflicts.
-
-  const fallbackTables: string[][] = Array.from({ length: numTables }, () => []);
-
-  for (let i = 0; i < sortedIds.length; i++) {
-    const playerId = sortedIds[i];
-    const opps = opponentSets.get(playerId)!;
-    let bestTable = -1;
-    let bestConflicts = Infinity;
-    let bestIsPreferred = false;
-
-    for (const t of tableOrder(i)) {
-      if (fallbackTables[t].length >= 4) continue;
-
-      let conflicts = 0;
-      for (const otherId of fallbackTables[t]) {
-        if (opps.has(otherId)) conflicts++;
-      }
-
-      const isPreferred = t === preferredTable[i];
-
-      // Pick this table if: fewer conflicts, OR same conflicts but preferred
-      if (
-        conflicts < bestConflicts ||
-        (conflicts === bestConflicts && isPreferred && !bestIsPreferred)
-      ) {
-        bestConflicts = conflicts;
-        bestTable = t;
-        bestIsPreferred = isPreferred;
-      }
-    }
-
-    if (bestTable >= 0) {
-      fallbackTables[bestTable].push(playerId);
+    for (const [seatSetA, seatSetB] of [schedule]) {
+      tables.push({
+        id: tableId++,
+        playerIds: seatSetA.map((seat) => groupPlayers[seat]?.id).filter(Boolean),
+        results: [],
+        isComplete: false,
+      });
+      tables.push({
+        id: tableId++,
+        playerIds: seatSetB.map((seat) => groupPlayers[seat]?.id).filter(Boolean),
+        results: [],
+        isComplete: false,
+      });
     }
   }
 
-  return fallbackTables;
+  return tables;
 }
 
 function shuffleArray<T>(arr: T[]): void {
@@ -516,7 +400,6 @@ export function getVpSharePct(playerId: string, rounds: Round[]): number {
   let gamesPlayed = 0;
 
   for (const round of rounds) {
-    if (!round.isComplete) continue;
     for (const table of round.tables) {
       if (!table.isComplete || table.results.length === 0) continue;
       const playerResult = table.results.find((r) => r.playerId === playerId);
@@ -546,8 +429,7 @@ export function getStandings(players: Player[], rounds: Round[] = []): Player[] 
     const aShare = vpShareCache.get(a.id) ?? 0;
     const bShare = vpShareCache.get(b.id) ?? 0;
     if (bShare !== aShare) return bShare - aShare;
-    if (b.totalVP !== a.totalVP) return b.totalVP - a.totalVP;
-    return a.efficiency - b.efficiency; // lower efficiency = better
+    return b.totalVP - a.totalVP;
   });
 }
 
@@ -721,20 +603,23 @@ export function getLeaderStats(
   const statsMap = new Map<string, { plays: number; wins: number; top2: number; totalVP: number; positionSum: number; roundsAvailable: number }>();
 
   for (const round of rounds) {
-    if (!round.isComplete) continue;
     if (fromRound !== undefined && round.number < fromRound) continue;
     if (toRound !== undefined && round.number > toRound) continue;
 
-    // Track which leaders were available this round
-    const available = new Set(round.availableLeaders ?? []);
-    for (const name of available) {
-      if (!statsMap.has(name)) {
-        statsMap.set(name, { plays: 0, wins: 0, top2: 0, totalVP: 0, positionSum: 0, roundsAvailable: 0 });
+    // Track which leaders were available this round (if any table completed)
+    const hasAnyComplete = round.tables.some((t) => t.isComplete);
+    if (hasAnyComplete) {
+      const available = new Set(round.availableLeaders ?? []);
+      for (const name of available) {
+        if (!statsMap.has(name)) {
+          statsMap.set(name, { plays: 0, wins: 0, top2: 0, totalVP: 0, positionSum: 0, roundsAvailable: 0 });
+        }
+        statsMap.get(name)!.roundsAvailable++;
       }
-      statsMap.get(name)!.roundsAvailable++;
     }
 
     for (const table of round.tables) {
+      if (!table.isComplete) continue;
       for (const result of table.results) {
         if (!result.leader) continue;
 
@@ -814,8 +699,8 @@ export function getLeaderStatsByPhase(
  */
 export function getTierForRound(roundNumber: number, isTop8: boolean): LeaderTier {
   if (isTop8) return "C";
-  const TIER_CYCLE: LeaderTier[] = ["A", "B", "C"];
-  return TIER_CYCLE[(roundNumber - 1) % TIER_CYCLE.length];
+  const TIER_BY_ROUND: LeaderTier[] = ["B", "C", "A", "B"];
+  return TIER_BY_ROUND[(roundNumber - 1) % TIER_BY_ROUND.length];
 }
 
 /**

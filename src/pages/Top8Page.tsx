@@ -11,9 +11,6 @@ import { getTop8, getFinalStandings } from "../engine/tournament";
 import { generateRandomTableResults } from "../engine/testUtils";
 import { Trophy, Crown, Swords, ChevronRight, BarChart3, FlaskConical, History } from "lucide-react";
 
-const ELITE_TABLE_LABELS = ["Elite Table A", "Elite Table B"];
-const CHALLENGER_TABLE_LABELS = ["Challenger Table C", "Challenger Table D"];
-const LOWER_FINAL_LABELS = ["Lower Final 1 — Trial of Gom Jabbar", "Lower Final 2 — Water of Life"];
 
 interface Top8PageProps {
   state: TournamentState;
@@ -257,60 +254,54 @@ export function Top8Page({
               </button>
             </div>
           )}
-          {/* ── Semifinals: split into Elite & Challenger sections ── */}
+          {/* ── Knockouts: SF1 A/B + Elim A/B ── */}
           {currentRound.type === "semifinal" && (
             <>
-              {/* Elite Bracket */}
-              <h2 className="text-display text-sm text-center text-sand-dark mb-4">
-                Round {currentRound.number} — Elite Bracket (1-8)
+              {/* SF1 */}
+              <h2 className="text-display text-sm text-center text-red-400 mb-4 uppercase tracking-widest">
+                Semi-Final 1 — Group Winners
               </h2>
-              <DramaticReveal
-                roundKey={`elite-r${currentRound.number}`}
-                enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
-                labels={ELITE_TABLE_LABELS}
-                items={currentRound.tables.slice(0, 2).map((table, index) => (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                {currentRound.tables.slice(0, 2).map((table, index) => (
                   <div key={`r${currentRound.number}-t${table.id}`}>
-                    <p className="text-xs text-center text-spice uppercase tracking-widest mb-2">
-                      {ELITE_TABLE_LABELS[index] ?? `Table ${index + 1}`}
+                    <p className="text-xs text-center text-red-400 uppercase tracking-widest mb-2">
+                      {index === 0 ? "SF1 — Table A" : "SF1 — Table B"}
                     </p>
                     <TableCard
                       table={table}
                       players={state.players}
                       roundIndex={state.rounds.indexOf(currentRound)}
                       onSubmitResults={onSubmitResults}
-                      animationDelay={dramaticReveal ? 0 : index}
+                      animationDelay={index}
                       allowEdit
                       availableLeaders={currentRound.availableLeaders}
                     />
                   </div>
                 ))}
-              />
+              </div>
 
-              {/* Challenger Bracket */}
-              <h2 className="text-display text-sm text-center text-sand-dark mb-4 mt-6">
-                Round {currentRound.number} — Challenger Bracket (9-16)
+              {/* Eliminator */}
+              <h2 className="text-display text-sm text-center text-red-400 mb-4 uppercase tracking-widest">
+                Eliminator — Runner-Ups
               </h2>
-              <DramaticReveal
-                roundKey={`challenger-r${currentRound.number}`}
-                enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
-                labels={CHALLENGER_TABLE_LABELS}
-                items={currentRound.tables.slice(2, 4).map((table, index) => (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {currentRound.tables.slice(2, 4).map((table, index) => (
                   <div key={`r${currentRound.number}-t${table.id}`}>
-                    <p className="text-xs text-center text-sand-dark uppercase tracking-widest mb-2">
-                      {CHALLENGER_TABLE_LABELS[index] ?? `Table ${index + 3}`}
+                    <p className="text-xs text-center text-red-400 uppercase tracking-widest mb-2">
+                      {index === 0 ? "Eliminator A" : "Eliminator B"}
                     </p>
                     <TableCard
                       table={table}
                       players={state.players}
                       roundIndex={state.rounds.indexOf(currentRound)}
                       onSubmitResults={onSubmitResults}
-                      animationDelay={dramaticReveal ? 0 : index + 2}
+                      animationDelay={index + 2}
                       allowEdit
                       availableLeaders={currentRound.availableLeaders}
                     />
                   </div>
                 ))}
-              />
+              </div>
             </>
           )}
 
@@ -318,49 +309,28 @@ export function Top8Page({
           {currentRound.type === "winners-final" && (
             <>
               <h2 className="text-display text-sm text-center text-sand-dark mb-4">
-                Round {currentRound.number} — Redemption Round
+                Round {currentRound.number} — Semi-Final 2
               </h2>
 
-              {/* Finalists Bye Table */}
-              <div className="stone-card p-4 mb-6 border border-spice/30">
-                <p className="text-xs text-center text-spice uppercase tracking-widest mb-3">
-                  Finalists — Direct to Grand Final
-                </p>
-                <div className="flex justify-center gap-4">
-                  {currentRound.tables[0]?.playerIds.map((pid) => {
-                    const player = state.players.find((p) => p.id === pid);
-                    return (
-                      <div key={pid} className="flex items-center gap-2 px-4 py-2 glass-morphism rounded">
-                        <Crown size={14} className="text-spice" />
-                        <span className="text-sand text-sm font-semibold">{player?.name ?? pid}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Lower Finals */}
-              <DramaticReveal
-                roundKey={`redemption-r${currentRound.number}`}
-                enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
-                labels={LOWER_FINAL_LABELS}
-                items={currentRound.tables.slice(1).map((table, index) => (
+              {/* SF2 A and SF2 B */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {currentRound.tables.map((table, index) => (
                   <div key={`r${currentRound.number}-t${table.id}`}>
                     <p className="text-xs text-center text-spice uppercase tracking-widest mb-2">
-                      {LOWER_FINAL_LABELS[index] ?? `Lower Final ${index + 1}`}
+                      {index === 0 ? "SF2 — Table A" : "SF2 — Table B"}
                     </p>
                     <TableCard
                       table={table}
                       players={state.players}
                       roundIndex={state.rounds.indexOf(currentRound)}
                       onSubmitResults={onSubmitResults}
-                      animationDelay={dramaticReveal ? 0 : index}
+                      animationDelay={index}
                       allowEdit
                       availableLeaders={currentRound.availableLeaders}
                     />
                   </div>
                 ))}
-              />
+              </div>
             </>
           )}
 

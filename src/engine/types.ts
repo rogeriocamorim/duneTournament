@@ -8,13 +8,16 @@ export interface Player {
   wins: number;        // count of 1st-place finishes (tiebreaker after points)
   efficiency: number;  // lower = better (sum of game round finishes)
   opponents: string[]; // ids of players already faced
+  groupId?: number;    // 0-7 for 8 groups in Colosseum format
 }
 
 export interface TableResult {
   playerId: string;
-  position: number; // 1-4
+  position: number; // 1-4 (final placement)
   vp: number;
-  leader?: string; // leader picked for this game
+  leader?: string;      // leader picked for this game
+  seatPosition?: number; // 1-4 (seat/table position, for snake draft analysis)
+  pickOrder?: number;    // 1-4 (draft pick order, for pick order analysis)
 }
 
 export interface Table {
@@ -45,7 +48,7 @@ export interface TournamentState {
   };
   players: Player[];
   rounds: Round[];
-  phase: "registration" | "qualifying" | "top8" | "finished";
+  phase: "registration" | "group-draw" | "qualifying" | "knockout-draw" | "top8" | "finished";
   currentRound: number;
   settings: {
     totalQualifyingRounds: number;
@@ -66,14 +69,14 @@ export const DEFAULT_STATE: TournamentState = {
   metadata: {
     version: "1.0.0",
     timestamp: new Date().toISOString(),
-    tournamentName: "Dune Bloodlines Open",
+    tournamentName: "The Colosseum — Uprising • Bloodlines",
   },
   players: [],
   rounds: [],
   phase: "registration",
   currentRound: 0,
   settings: {
-    totalQualifyingRounds: 5,
+    totalQualifyingRounds: 4,
     topCut: 16,
     dramaticReveal: true,
     testMode: false,
@@ -95,18 +98,19 @@ export interface LeaderInfo {
 
 export const LEADER_LIST: LeaderInfo[] = [
   // ── Base Game ──
-  { id: "paulAtreides",      name: "Paul Atreides",                  tier: "none", expansion: "base",       imageSlug: "dune-imperium-leader-paul-atreides" },
+  { id: "paulAtreides",      name: "Paul Atreides (Community)",      tier: "B",    expansion: "base",       imageSlug: "dune-imperium-leader-paul-atreides", isCommunity: true },
   { id: "letoAtreides",      name: "Duke Leto Atreides",             tier: "C",    expansion: "base",       imageSlug: "dune-imperium-leader-dune-leto-atreides" },
   { id: "memnonThorvald",    name: "Earl Memnon Thorvald",           tier: "none", expansion: "base",       imageSlug: "dune-imperium-leader-earl-memnon-thorvald" },
-  { id: "glossuRabban",      name: 'Glossu "The Beast" Rabban',      tier: "A",    expansion: "base",       imageSlug: "dune-imperium-leader-glossu-the-beast-rabban" },
+  { id: "glossuRabban",      name: 'Glossu "The Beast" Rabban',      tier: "none", expansion: "base",       imageSlug: "dune-imperium-leader-glossu-the-beast-rabban" },
   { id: "vladimirHarkonnen", name: "Baron Vladimir Harkonnen",       tier: "C",    expansion: "base",       imageSlug: "dune-imperium-leader-baron-vladimir-harkonnen" },
   { id: "helenaRichese",     name: "Helena Richese",                 tier: "none", expansion: "base",       imageSlug: "dune-imperium-leader-helena-richese" },
-  { id: "arianaThorvald",    name: "Countess Ariana Thorvald",       tier: "none", expansion: "base",       imageSlug: "dune-imperium-leader-countess-ariana-thorvald" },
-  { id: "ilbanRichese",      name: "Count Ilban Richese",            tier: "none", expansion: "base",       imageSlug: "dune-imperium-leader-count-ilban-richese" },
+  { id: "arianaThorvald",    name: "Countess Ariana Thorvald (Community)", tier: "A", expansion: "base",    imageSlug: "dune-imperium-leader-countess-ariana-thorvald", isCommunity: true },
+  { id: "ilbanRichese",      name: "Count Ilban Richese (Community)",tier: "B",    expansion: "base",       imageSlug: "dune-imperium-leader-count-ilban-richese", isCommunity: true },
   { id: "armandEcaz",        name: "Archduke Armand Ecaz",           tier: "C",    expansion: "base",       imageSlug: "rise-of-ix-leader-archduke-armand-ecaz" },
   // ── Ix Expansion ──
   { id: "tessiaVernius",     name: "Tessia Vernius",                 tier: "A",    expansion: "ix",         imageSlug: "rise-of-ix-leader-tessia-vernius" },
   { id: "ilesaEcaz_com",     name: "Ilesa Ecaz (Community)",         tier: "A",    expansion: "ix",         imageSlug: "rise-of-ix-leader-ilesa-ecaz", isCommunity: true },
+  { id: "rhomburVernius_com",name: "Prince Rhombur Vernius (Community)",tier: "A", expansion: "ix",         imageSlug: "rise-of-ix-leader-rhombur-vernius", isCommunity: true },
   // ── Uprising Expansion ──
   { id: "stabanTuek",        name: "Staban Tuek",                    tier: "A",    expansion: "uprising",   imageSlug: "uprising-leader-staban-tuek" },
   { id: "amberMetulli",      name: "Lady Amber Metulli",             tier: "B",    expansion: "uprising",   imageSlug: "uprising-leader-lady-amber-metulli" },
