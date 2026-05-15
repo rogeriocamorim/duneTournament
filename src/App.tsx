@@ -1,10 +1,13 @@
 import { useState, useCallback, useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useTournamentState } from "./hooks/useTournamentState";
+import { ModeSelectorPage } from "./pages/ModeSelectorPage";
 import { RegistrationPage } from "./pages/RegistrationPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { Top8Page } from "./pages/Top8Page";
 import { SpectatorPage } from "./pages/SpectatorPage";
+import { SpinnerWheelPage } from "./pages/SpinnerWheelPage";
+import { KnockoutRandomizer } from "./pages/KnockoutRandomizer";
 import { GuildNavigator } from "./components/GuildNavigator";
 import { ShareModal } from "./components/ShareModal";
 import { SandstormTransition } from "./components/animations/SandstormTransition";
@@ -33,6 +36,7 @@ function App() {
 
   const {
     state,
+    selectMode,
     addPlayer,
     removePlayer,
     startTournament,
@@ -47,6 +51,9 @@ function App() {
     toggleDramaticReveal,
     toggleTestMode,
     generateShareableLink,
+    // Colosseum-specific
+    setGroupAssignments,
+    confirmKnockoutDraw,
   } = useTournamentState();
 
   const [showNavigator, setShowNavigator] = useState(false);
@@ -88,9 +95,13 @@ function App() {
   const handleStart = useCallback(() => {
     transitionTo(() => {
       startTournament();
-      generateRound();
+      // Classic mode: generate first round immediately
+      // Colosseum mode: goes to group-draw phase, rounds generated after assignments
+      if (state.mode === "classic") {
+        generateRound();
+      }
     });
-  }, [transitionTo, startTournament, generateRound]);
+  }, [transitionTo, startTournament, generateRound, state.mode]);
 
   const handleStartTop8 = useCallback(() => {
     transitionTo(() => {
@@ -199,6 +210,17 @@ function App() {
 
       {/* Main Content */}
       <AnimatePresence mode="wait">
+        {state.phase === "home" && (
+          <motion.div
+            key="home"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <ModeSelectorPage onSelectMode={selectMode} />
+          </motion.div>
+        )}
+
         {state.phase === "registration" && (
           <motion.div
             key="registration"
@@ -212,6 +234,23 @@ function App() {
               onRemovePlayer={removePlayer}
               onStart={handleStart}
               testMode={state.settings.testMode}
+              mode={state.mode}
+            />
+          </motion.div>
+        )}
+
+        {state.phase === "group-draw" && (
+          <motion.div
+            key="group-draw"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <SpinnerWheelPage
+              players={state.players}
+              onConfirm={(assignments: Map<string, number>) => {
+                transitionTo(() => setGroupAssignments(assignments));
+              }}
             />
           </motion.div>
         )}
@@ -231,6 +270,29 @@ function App() {
               onStartTop8={handleStartTop8}
               dramaticReveal={state.settings.dramaticReveal}
               testMode={state.settings.testMode}
+            />
+          </motion.div>
+        )}
+
+        {state.phase === "knockout-draw" && (
+          <motion.div
+            key="knockout-draw"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <KnockoutRandomizer
+              players={state.players}
+              rounds={state.rounds}
+              onConfirm={(sf1a, sf1b, elimA, elimB) => {
+                const tables = [
+                  sf1a.map((p) => p.id),
+                  sf1b.map((p) => p.id),
+                  elimA.map((p) => p.id),
+                  elimB.map((p) => p.id),
+                ];
+                transitionTo(() => confirmKnockoutDraw(tables));
+              }}
             />
           </motion.div>
         )}

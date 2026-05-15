@@ -11,9 +11,15 @@ import { getTop8, getFinalStandings } from "../engine/tournament";
 import { generateRandomTableResults } from "../engine/testUtils";
 import { Trophy, Crown, Swords, ChevronRight, BarChart3, FlaskConical, History } from "lucide-react";
 
+// ===== Classic mode table labels =====
 const ELITE_TABLE_LABELS = ["Elite Table A", "Elite Table B"];
 const CHALLENGER_TABLE_LABELS = ["Challenger Table C", "Challenger Table D"];
-const LOWER_FINAL_LABELS = ["Lower Final 1 — Trial of Gom Jabbar", "Lower Final 2 — Water of Life"];
+const LOWER_FINAL_LABELS = ["Lower Final 1 \u2014 Trial of Gom Jabbar", "Lower Final 2 \u2014 Water of Life"];
+
+// ===== Colosseum mode table labels =====
+const COLOSSEUM_SF_LABELS = ["Semifinal 1A", "Semifinal 1B"];
+const COLOSSEUM_ELIM_LABELS = ["Eliminator A", "Eliminator B"];
+const COLOSSEUM_SF2_LABELS = ["Semifinal 2A", "Semifinal 2B"];
 
 interface Top8PageProps {
   state: TournamentState;
@@ -38,6 +44,8 @@ export function Top8Page({
   const [showLeaderReveal, setShowLeaderReveal] = useState(false);
   const [leaderRevealDone, setLeaderRevealDone] = useState(false);
   const lastRevealedRound = useRef<number>(0);
+
+  const isColosseum = state.mode === "colosseum";
   const top8 = getTop8(state);
 
   const top8Rounds = state.rounds.filter(
@@ -93,14 +101,14 @@ export function Top8Page({
     const batch: { tableId: number; results: TableResult[] }[] = [];
     for (const table of lastElimRound.tables) {
       if (!table.isComplete) {
-        const results = generateRandomTableResults(table, lastElimRound.availableLeaders);
+        const results = generateRandomTableResults(table, lastElimRound.availableLeaders, state.mode);
         batch.push({ tableId: table.id, results });
       }
     }
     if (batch.length > 0) {
       onBatchSubmitResults(roundIndex, batch);
     }
-  }, [lastElimRound, state.rounds, onBatchSubmitResults]);
+  }, [lastElimRound, state.rounds, state.mode, onBatchSubmitResults]);
 
   const isFinished = state.phase === "finished";
 
@@ -129,11 +137,17 @@ export function Top8Page({
         className="text-center mb-8"
       >
         <h1 className="text-display text-2xl md:text-3xl text-spice spice-text-glow mb-1">
-          {isFinished ? "The Prophecy Fulfilled" : "The Landsraad"}
+          {isFinished
+            ? "The Prophecy Fulfilled"
+            : isColosseum
+            ? "Knockout Stage"
+            : "The Landsraad"}
         </h1>
         <p className="text-xs text-sand-dark uppercase tracking-[0.3em]">
           {isFinished
             ? "A New Emperor Rises"
+            : isColosseum
+            ? "Elimination Bracket"
             : "Double-Chance Championship Pods"}
         </p>
       </motion.div>
@@ -168,8 +182,8 @@ export function Top8Page({
         </motion.div>
       )}
 
-      {/* Top 16 Seedings */}
-      {!isFinished && top8Rounds.length === 0 && (
+      {/* Top 16 Seedings (Classic only — Colosseum uses knockout randomizer) */}
+      {!isFinished && !isColosseum && top8Rounds.length === 0 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -220,7 +234,11 @@ export function Top8Page({
             className="btn-imperial-filled py-3 px-8 flex items-center gap-2 mx-auto"
           >
             <ChevronRight size={18} />
-            {currentRound?.type === "semifinal" ? "Generate Redemption Round" : "Generate Grand Final"}
+            {currentRound?.type === "semifinal"
+              ? isColosseum
+                ? "Generate Semifinal 2"
+                : "Generate Redemption Round"
+              : "Generate Grand Final"}
           </button>
         </motion.div>
       )}
@@ -257,118 +275,214 @@ export function Top8Page({
               </button>
             </div>
           )}
-          {/* ── Semifinals: split into Elite & Challenger sections ── */}
+
+          {/* ===== SEMIFINALS ===== */}
           {currentRound.type === "semifinal" && (
             <>
-              {/* Elite Bracket */}
-              <h2 className="text-display text-sm text-center text-sand-dark mb-4">
-                Round {currentRound.number} — Elite Bracket (1-8)
-              </h2>
-              <DramaticReveal
-                roundKey={`elite-r${currentRound.number}`}
-                enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
-                labels={ELITE_TABLE_LABELS}
-                items={currentRound.tables.slice(0, 2).map((table, index) => (
-                  <div key={`r${currentRound.number}-t${table.id}`}>
-                    <p className="text-xs text-center text-spice uppercase tracking-widest mb-2">
-                      {ELITE_TABLE_LABELS[index] ?? `Table ${index + 1}`}
-                    </p>
-                    <TableCard
-                      table={table}
-                      players={state.players}
-                      roundIndex={state.rounds.indexOf(currentRound)}
-                      onSubmitResults={onSubmitResults}
-                      animationDelay={dramaticReveal ? 0 : index}
-                      allowEdit
-                      availableLeaders={currentRound.availableLeaders}
-                    />
-                  </div>
-                ))}
-              />
+              {isColosseum ? (
+                <>
+                  {/* Colosseum: Semifinals (tables 0-1) + Eliminators (tables 2-3) */}
+                  <h2 className="text-display text-sm text-center text-sand-dark mb-4">
+                    Round {currentRound.number} &mdash; Semifinals
+                  </h2>
+                  <DramaticReveal
+                    roundKey={`colosseum-sf-r${currentRound.number}`}
+                    enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
+                    labels={COLOSSEUM_SF_LABELS}
+                    items={currentRound.tables.slice(0, 2).map((table, index) => (
+                      <div key={`r${currentRound.number}-t${table.id}`}>
+                        <p className="text-xs text-center text-spice uppercase tracking-widest mb-2">
+                          {COLOSSEUM_SF_LABELS[index] ?? `Table ${index + 1}`}
+                        </p>
+                        <TableCard
+                          table={table}
+                          players={state.players}
+                          roundIndex={state.rounds.indexOf(currentRound)}
+                          onSubmitResults={onSubmitResults}
+                          animationDelay={dramaticReveal ? 0 : index}
+                          allowEdit
+                          availableLeaders={currentRound.availableLeaders}
+                          mode={state.mode}
+                        />
+                      </div>
+                    ))}
+                  />
 
-              {/* Challenger Bracket */}
-              <h2 className="text-display text-sm text-center text-sand-dark mb-4 mt-6">
-                Round {currentRound.number} — Challenger Bracket (9-16)
-              </h2>
-              <DramaticReveal
-                roundKey={`challenger-r${currentRound.number}`}
-                enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
-                labels={CHALLENGER_TABLE_LABELS}
-                items={currentRound.tables.slice(2, 4).map((table, index) => (
-                  <div key={`r${currentRound.number}-t${table.id}`}>
-                    <p className="text-xs text-center text-sand-dark uppercase tracking-widest mb-2">
-                      {CHALLENGER_TABLE_LABELS[index] ?? `Table ${index + 3}`}
-                    </p>
-                    <TableCard
-                      table={table}
-                      players={state.players}
-                      roundIndex={state.rounds.indexOf(currentRound)}
-                      onSubmitResults={onSubmitResults}
-                      animationDelay={dramaticReveal ? 0 : index + 2}
-                      allowEdit
-                      availableLeaders={currentRound.availableLeaders}
-                    />
-                  </div>
-                ))}
-              />
+                  <h2 className="text-display text-sm text-center text-sand-dark mb-4 mt-6">
+                    Round {currentRound.number} &mdash; Eliminators
+                  </h2>
+                  <DramaticReveal
+                    roundKey={`colosseum-elim-r${currentRound.number}`}
+                    enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
+                    labels={COLOSSEUM_ELIM_LABELS}
+                    items={currentRound.tables.slice(2, 4).map((table, index) => (
+                      <div key={`r${currentRound.number}-t${table.id}`}>
+                        <p className="text-xs text-center text-sand-dark uppercase tracking-widest mb-2">
+                          {COLOSSEUM_ELIM_LABELS[index] ?? `Table ${index + 3}`}
+                        </p>
+                        <TableCard
+                          table={table}
+                          players={state.players}
+                          roundIndex={state.rounds.indexOf(currentRound)}
+                          onSubmitResults={onSubmitResults}
+                          animationDelay={dramaticReveal ? 0 : index + 2}
+                          allowEdit
+                          availableLeaders={currentRound.availableLeaders}
+                          mode={state.mode}
+                        />
+                      </div>
+                    ))}
+                  />
+                </>
+              ) : (
+                <>
+                  {/* Classic: Elite Bracket (tables 0-1) + Challenger Bracket (tables 2-3) */}
+                  <h2 className="text-display text-sm text-center text-sand-dark mb-4">
+                    Round {currentRound.number} &mdash; Elite Bracket (1-8)
+                  </h2>
+                  <DramaticReveal
+                    roundKey={`elite-r${currentRound.number}`}
+                    enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
+                    labels={ELITE_TABLE_LABELS}
+                    items={currentRound.tables.slice(0, 2).map((table, index) => (
+                      <div key={`r${currentRound.number}-t${table.id}`}>
+                        <p className="text-xs text-center text-spice uppercase tracking-widest mb-2">
+                          {ELITE_TABLE_LABELS[index] ?? `Table ${index + 1}`}
+                        </p>
+                        <TableCard
+                          table={table}
+                          players={state.players}
+                          roundIndex={state.rounds.indexOf(currentRound)}
+                          onSubmitResults={onSubmitResults}
+                          animationDelay={dramaticReveal ? 0 : index}
+                          allowEdit
+                          availableLeaders={currentRound.availableLeaders}
+                          mode={state.mode}
+                        />
+                      </div>
+                    ))}
+                  />
+
+                  <h2 className="text-display text-sm text-center text-sand-dark mb-4 mt-6">
+                    Round {currentRound.number} &mdash; Challenger Bracket (9-16)
+                  </h2>
+                  <DramaticReveal
+                    roundKey={`challenger-r${currentRound.number}`}
+                    enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
+                    labels={CHALLENGER_TABLE_LABELS}
+                    items={currentRound.tables.slice(2, 4).map((table, index) => (
+                      <div key={`r${currentRound.number}-t${table.id}`}>
+                        <p className="text-xs text-center text-sand-dark uppercase tracking-widest mb-2">
+                          {CHALLENGER_TABLE_LABELS[index] ?? `Table ${index + 3}`}
+                        </p>
+                        <TableCard
+                          table={table}
+                          players={state.players}
+                          roundIndex={state.rounds.indexOf(currentRound)}
+                          onSubmitResults={onSubmitResults}
+                          animationDelay={dramaticReveal ? 0 : index + 2}
+                          allowEdit
+                          availableLeaders={currentRound.availableLeaders}
+                          mode={state.mode}
+                        />
+                      </div>
+                    ))}
+                  />
+                </>
+              )}
             </>
           )}
 
-          {/* ── Redemption Round (3 tables: Finalists bye + 2 Lower Finals) ── */}
+          {/* ===== WINNERS-FINAL / REDEMPTION / SF2 ===== */}
           {currentRound.type === "winners-final" && (
             <>
-              <h2 className="text-display text-sm text-center text-sand-dark mb-4">
-                Round {currentRound.number} — Redemption Round
-              </h2>
-
-              {/* Finalists Bye Table */}
-              <div className="stone-card p-4 mb-6 border border-spice/30">
-                <p className="text-xs text-center text-spice uppercase tracking-widest mb-3">
-                  Finalists — Direct to Grand Final
-                </p>
-                <div className="flex justify-center gap-4">
-                  {currentRound.tables[0]?.playerIds.map((pid) => {
-                    const player = state.players.find((p) => p.id === pid);
-                    return (
-                      <div key={pid} className="flex items-center gap-2 px-4 py-2 glass-morphism rounded">
-                        <Crown size={14} className="text-spice" />
-                        <span className="text-sand text-sm font-semibold">{player?.name ?? pid}</span>
+              {isColosseum ? (
+                <>
+                  {/* Colosseum SF2: 2 competitive tables (no bye) */}
+                  <h2 className="text-display text-sm text-center text-sand-dark mb-4">
+                    Round {currentRound.number} &mdash; Semifinal 2
+                  </h2>
+                  <DramaticReveal
+                    roundKey={`colosseum-sf2-r${currentRound.number}`}
+                    enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
+                    labels={COLOSSEUM_SF2_LABELS}
+                    items={currentRound.tables.map((table, index) => (
+                      <div key={`r${currentRound.number}-t${table.id}`}>
+                        <p className="text-xs text-center text-spice uppercase tracking-widest mb-2">
+                          {COLOSSEUM_SF2_LABELS[index] ?? `SF2 Table ${index + 1}`}
+                        </p>
+                        <TableCard
+                          table={table}
+                          players={state.players}
+                          roundIndex={state.rounds.indexOf(currentRound)}
+                          onSubmitResults={onSubmitResults}
+                          animationDelay={dramaticReveal ? 0 : index}
+                          allowEdit
+                          availableLeaders={currentRound.availableLeaders}
+                          mode={state.mode}
+                        />
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
+                    ))}
+                  />
+                </>
+              ) : (
+                <>
+                  {/* Classic Redemption: Bye table + 2 Lower Finals */}
+                  <h2 className="text-display text-sm text-center text-sand-dark mb-4">
+                    Round {currentRound.number} &mdash; Redemption Round
+                  </h2>
 
-              {/* Lower Finals */}
-              <DramaticReveal
-                roundKey={`redemption-r${currentRound.number}`}
-                enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
-                labels={LOWER_FINAL_LABELS}
-                items={currentRound.tables.slice(1).map((table, index) => (
-                  <div key={`r${currentRound.number}-t${table.id}`}>
-                    <p className="text-xs text-center text-spice uppercase tracking-widest mb-2">
-                      {LOWER_FINAL_LABELS[index] ?? `Lower Final ${index + 1}`}
+                  {/* Finalists Bye Table */}
+                  <div className="stone-card p-4 mb-6 border border-spice/30">
+                    <p className="text-xs text-center text-spice uppercase tracking-widest mb-3">
+                      Finalists &mdash; Direct to Grand Final
                     </p>
-                    <TableCard
-                      table={table}
-                      players={state.players}
-                      roundIndex={state.rounds.indexOf(currentRound)}
-                      onSubmitResults={onSubmitResults}
-                      animationDelay={dramaticReveal ? 0 : index}
-                      allowEdit
-                      availableLeaders={currentRound.availableLeaders}
-                    />
+                    <div className="flex justify-center gap-4">
+                      {currentRound.tables[0]?.playerIds.map((pid) => {
+                        const player = state.players.find((p) => p.id === pid);
+                        return (
+                          <div key={pid} className="flex items-center gap-2 px-4 py-2 glass-morphism rounded">
+                            <Crown size={14} className="text-spice" />
+                            <span className="text-sand text-sm font-semibold">{player?.name ?? pid}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                ))}
-              />
+
+                  {/* Lower Finals */}
+                  <DramaticReveal
+                    roundKey={`redemption-r${currentRound.number}`}
+                    enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
+                    labels={LOWER_FINAL_LABELS}
+                    items={currentRound.tables.slice(1).map((table, index) => (
+                      <div key={`r${currentRound.number}-t${table.id}`}>
+                        <p className="text-xs text-center text-spice uppercase tracking-widest mb-2">
+                          {LOWER_FINAL_LABELS[index] ?? `Lower Final ${index + 1}`}
+                        </p>
+                        <TableCard
+                          table={table}
+                          players={state.players}
+                          roundIndex={state.rounds.indexOf(currentRound)}
+                          onSubmitResults={onSubmitResults}
+                          animationDelay={dramaticReveal ? 0 : index}
+                          allowEdit
+                          availableLeaders={currentRound.availableLeaders}
+                          mode={state.mode}
+                        />
+                      </div>
+                    ))}
+                  />
+                </>
+              )}
             </>
           )}
 
-          {/* ── Grand Final ── */}
+          {/* ===== GRAND FINAL ===== */}
           {currentRound.type === "grand-final" && (
             <>
               <h2 className="text-display text-sm text-center text-sand-dark mb-4">
-                Round {currentRound.number} — Grand Final
+                Round {currentRound.number} &mdash; Grand Final
               </h2>
               <DramaticReveal
                 roundKey={`grand-final-r${currentRound.number}`}
@@ -385,6 +499,7 @@ export function Top8Page({
                       animationDelay={dramaticReveal ? 0 : index}
                       allowEdit
                       availableLeaders={currentRound.availableLeaders}
+                      mode={state.mode}
                     />
                   </div>
                 ))}

@@ -1,5 +1,7 @@
 // ===== CORE TYPES =====
 
+export type TournamentMode = "classic" | "colosseum";
+
 export interface Player {
   id: string;
   name: string;
@@ -8,13 +10,16 @@ export interface Player {
   wins: number;        // count of 1st-place finishes (tiebreaker after points)
   efficiency: number;  // lower = better (sum of game round finishes)
   opponents: string[]; // ids of players already faced
+  groupId?: number;    // Colosseum mode: group 0-7
 }
 
 export interface TableResult {
   playerId: string;
   position: number; // 1-4
   vp: number;
-  leader?: string; // leader picked for this game
+  leader?: string;        // leader picked for this game
+  seatPosition?: number;  // Colosseum mode: seat at table
+  pickOrder?: number;     // Colosseum mode: leader pick order
 }
 
 export interface Table {
@@ -36,6 +41,7 @@ export interface Round {
 }
 
 export interface TournamentState {
+  mode: TournamentMode;
   metadata: {
     version: string;
     timestamp: string;
@@ -45,7 +51,7 @@ export interface TournamentState {
   };
   players: Player[];
   rounds: Round[];
-  phase: "registration" | "qualifying" | "top8" | "finished";
+  phase: "home" | "registration" | "group-draw" | "qualifying" | "knockout-draw" | "top8" | "finished";
   currentRound: number;
   settings: {
     totalQualifyingRounds: number;
@@ -63,6 +69,7 @@ export const POINTS_MAP: Record<number, number> = {
 };
 
 export const DEFAULT_STATE: TournamentState = {
+  mode: "classic",
   metadata: {
     version: "1.0.0",
     timestamp: new Date().toISOString(),
@@ -70,7 +77,7 @@ export const DEFAULT_STATE: TournamentState = {
   },
   players: [],
   rounds: [],
-  phase: "registration",
+  phase: "home",
   currentRound: 0,
   settings: {
     totalQualifyingRounds: 5,

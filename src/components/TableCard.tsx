@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "motion/react";
 import { useState, useEffect } from "react";
-import type { Table, TableResult, Player } from "../engine/types";
+import type { Table, TableResult, Player, TournamentMode } from "../engine/types";
 import { LEADER_LIST } from "../engine/types";
 import { Pencil, AlertTriangle } from "lucide-react";
 
@@ -12,6 +12,16 @@ interface TableCardProps {
   animationDelay?: number;
   allowEdit?: boolean;
   availableLeaders?: string[];
+  mode?: TournamentMode;
+}
+
+/** Local state shape for each player's result entry */
+interface LocalResult {
+  position: number;
+  vp: number;
+  leader: string;
+  seatPosition: number;
+  pickOrder: number;
 }
 
 /** Ordinal suffix for position numbers (1st, 2nd, 3rd, 4th) */
@@ -45,20 +55,28 @@ export function TableCard({
   animationDelay = 0,
   allowEdit = false,
   availableLeaders,
+  mode = "classic",
 }: TableCardProps) {
+  const isColosseum = mode === "colosseum";
   const [editing, setEditing] = useState(!table.isComplete);
-  const [results, setResults] = useState<Record<string, { position: number; vp: number; leader: string }>>(
+  const [results, setResults] = useState<Record<string, LocalResult>>(
     () => {
       if (table.isComplete) {
-        const map: Record<string, { position: number; vp: number; leader: string }> = {};
+        const map: Record<string, LocalResult> = {};
         for (const r of table.results) {
-          map[r.playerId] = { position: r.position, vp: r.vp, leader: r.leader || "" };
+          map[r.playerId] = {
+            position: r.position,
+            vp: r.vp,
+            leader: r.leader || "",
+            seatPosition: r.seatPosition || 0,
+            pickOrder: r.pickOrder || 0,
+          };
         }
         return map;
       }
-      const map: Record<string, { position: number; vp: number; leader: string }> = {};
+      const map: Record<string, LocalResult> = {};
       for (const id of table.playerIds) {
-        map[id] = { position: 0, vp: 0, leader: "" };
+        map[id] = { position: 0, vp: 0, leader: "", seatPosition: 0, pickOrder: 0 };
       }
       return map;
     }
@@ -68,15 +86,21 @@ export function TableCard({
   const [wasComplete, setWasComplete] = useState(table.isComplete);
 
   // Sync local state when table is completed externally (e.g. auto-fill).
-  // Only triggers when table.isComplete transitions from false → true,
+  // Only triggers when table.isComplete transitions from false -> true,
   // NOT when the user clicks the edit pencil on an already-complete table.
   useEffect(() => {
     if (table.isComplete && !wasComplete) {
       setWasComplete(true);
       setEditing(false);
-      const map: Record<string, { position: number; vp: number; leader: string }> = {};
+      const map: Record<string, LocalResult> = {};
       for (const r of table.results) {
-        map[r.playerId] = { position: r.position, vp: r.vp, leader: r.leader || "" };
+        map[r.playerId] = {
+          position: r.position,
+          vp: r.vp,
+          leader: r.leader || "",
+          seatPosition: r.seatPosition || 0,
+          pickOrder: r.pickOrder || 0,
+        };
       }
       setResults(map);
     }
@@ -109,6 +133,22 @@ export function TableCard({
     setResults((prev) => ({
       ...prev,
       [playerId]: { ...prev[playerId], leader },
+    }));
+  };
+
+  const handleSeatPositionChange = (playerId: string, seatPosition: number) => {
+    setError(null);
+    setResults((prev) => ({
+      ...prev,
+      [playerId]: { ...prev[playerId], seatPosition },
+    }));
+  };
+
+  const handlePickOrderChange = (playerId: string, pickOrder: number) => {
+    setError(null);
+    setResults((prev) => ({
+      ...prev,
+      [playerId]: { ...prev[playerId], pickOrder },
     }));
   };
 
@@ -158,13 +198,38 @@ export function TableCard({
       }
     }
 
+    // Colosseum-only: validate seat positions and pick orders
+    if (isColosseum) {
+      const seatPositions = entries.map(([, r]) => r.seatPosition);
+      const pickOrders = entries.map(([, r]) => r.pickOrder);
+
+      if (seatPositions.some((s) => s === 0)) {
+        setError("All seat positions must be set.");
+        return;
+      }
+      if (new Set(seatPositions).size !== seatPositions.length) {
+        setError("Seat positions must be unique.");
+        return;
+      }
+      if (pickOrders.some((p) => p === 0)) {
+        setError("All pick orders must be set.");
+        return;
+      }
+      if (new Set(pickOrders).size !== pickOrders.length) {
+        setError("Pick orders must be unique.");
+        return;
+      }
+    }
+
     setError(null);
     const tableResults: TableResult[] = entries.map(
-      ([playerId, { position, vp, leader }]) => ({
+      ([playerId, { position, vp, leader, seatPosition, pickOrder }]) => ({
         playerId,
         position,
         vp,
         leader: leader || undefined,
+        seatPosition: isColosseum ? seatPosition : undefined,
+        pickOrder: isColosseum ? pickOrder : undefined,
       })
     );
 
@@ -247,6 +312,52 @@ export function TableCard({
                 {player.name}
               </span>
 
+              {/* Seat Position selector (Colosseum only) */}
+              {isColosseum && editing && (
+                <select
+                  value={result?.seatPosition || 0}
+                  onChange={(e) =>
+                    handleSeatPositionChange(player.id, parseInt(e.target.value))
+                  }
+                  className="bg-black/50 border border-sand/20 text-sand text-xs px-1 py-1 rounded-sm w-16"
+                >
+                  <option value={0}>Seat</option>
+                  {[1, 2, 3, 4].map((s) => (
+                    <option key={s} value={s}>
+                      S{s}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {isColosseum && !editing && result?.seatPosition ? (
+                <span className="text-xs text-sand-dark opacity-50 w-10 text-center">
+                  S{result.seatPosition}
+                </span>
+              ) : null}
+
+              {/* Pick Order selector (Colosseum only) */}
+              {isColosseum && editing && (
+                <select
+                  value={result?.pickOrder || 0}
+                  onChange={(e) =>
+                    handlePickOrderChange(player.id, parseInt(e.target.value))
+                  }
+                  className="bg-black/50 border border-fremen-blue/30 text-sand text-xs px-1 py-1 rounded-sm w-16"
+                >
+                  <option value={0}>Pick</option>
+                  {[1, 2, 3, 4].map((p) => (
+                    <option key={p} value={p}>
+                      P{p}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {isColosseum && !editing && result?.pickOrder ? (
+                <span className="text-xs text-sand-dark opacity-50 w-10 text-center">
+                  P{result.pickOrder}
+                </span>
+              ) : null}
+
               {/* Leader selector */}
               {editing ? (
                 <select
@@ -270,11 +381,11 @@ export function TableCard({
                   ) : (
                     // Unfiltered: show all leaders grouped by expansion
                     (["base", "ix", "uprising", "bloodlines"] as const).map((exp) => {
-                      const leaders = LEADER_LIST.filter((l) => l.expansion === exp);
-                      if (leaders.length === 0) return null;
+                      const leadersByExp = LEADER_LIST.filter((l) => l.expansion === exp);
+                      if (leadersByExp.length === 0) return null;
                       return (
                         <optgroup key={exp} label={exp.charAt(0).toUpperCase() + exp.slice(1)}>
-                          {leaders.map((l) => (
+                          {leadersByExp.map((l) => (
                             <option key={l.id} value={l.name}>
                               {l.name}
                             </option>

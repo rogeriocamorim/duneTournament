@@ -1,4 +1,4 @@
-import type { Table, TableResult } from "./types";
+import type { Table, TableResult, TournamentMode } from "./types";
 import { LEADERS } from "./types";
 
 // ===== TEST DATA GENERATION =====
@@ -46,10 +46,12 @@ export function generateTestPlayerNames(count: number): string[] {
  * Generate random results for a single table.
  * Assigns random positions (1..N, unique), random VP (2-12), and random leaders
  * from the available pool if provided.
+ * In Colosseum mode, also generates random seatPosition and pickOrder.
  */
 export function generateRandomTableResults(
   table: Table,
   availableLeaders?: string[],
+  mode: TournamentMode = "classic",
 ): TableResult[] {
   const playerCount = table.playerIds.length;
 
@@ -62,11 +64,24 @@ export function generateRandomTableResults(
   const shuffledLeaders = [...leaderPool];
   shuffleArray(shuffledLeaders);
 
+  // Colosseum: shuffle seat positions and pick orders (1..N, unique per table)
+  let seatPositions: number[] | undefined;
+  let pickOrders: number[] | undefined;
+  if (mode === "colosseum") {
+    seatPositions = Array.from({ length: playerCount }, (_, i) => i + 1);
+    shuffleArray(seatPositions);
+    pickOrders = Array.from({ length: playerCount }, (_, i) => i + 1);
+    shuffleArray(pickOrders);
+  }
+
   return table.playerIds.map((playerId, i) => ({
     playerId,
     position: positions[i],
     vp: 2 + Math.floor(Math.random() * 11), // 2-12 VP
     leader: shuffledLeaders[i % shuffledLeaders.length],
+    ...(mode === "colosseum" && seatPositions && pickOrders
+      ? { seatPosition: seatPositions[i], pickOrder: pickOrders[i] }
+      : {}),
   }));
 }
 

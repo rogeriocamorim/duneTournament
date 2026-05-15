@@ -18,7 +18,10 @@ import {
   backfillPlayerWins,
   getRoundsPlayed,
   getVpSharePct,
+  assignGroups,
+  generateColosseumPairing,
 } from "./tournament";
+import { generateRandomTableResults } from "./testUtils";
 
 // ===== TEST HELPERS =====
 
@@ -53,6 +56,7 @@ function makeState(players: Player[]): TournamentState {
     rounds: [],
     phase: "top8",
     currentRound: 6,
+    mode: "classic",
     settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
   };
 }
@@ -849,6 +853,7 @@ describe("migrateLeaderNames", () => {
       rounds,
       currentRound: rounds.length,
       phase: "qualifying",
+      mode: "classic",
       settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
     };
   }
@@ -995,6 +1000,7 @@ describe("generateSwissPairing — golf mode", () => {
       rounds: [],
       phase: "qualifying",
       currentRound: 0,
+      mode: "classic",
       settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
     };
   }
@@ -1135,6 +1141,7 @@ describe("generateSwissPairing — golf mode", () => {
       rounds: [],
       phase: "qualifying",
       currentRound: 0,
+      mode: "classic",
       settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
     };
 
@@ -1167,6 +1174,7 @@ describe("generateSwissPairing — golf mode", () => {
       rounds: [],
       phase: "qualifying",
       currentRound: 0,
+      mode: "classic",
       settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
     };
 
@@ -1208,6 +1216,7 @@ describe("revertTableResults", () => {
       }],
       phase: "qualifying",
       currentRound: 1,
+      mode: "classic",
       settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
     };
 
@@ -1246,6 +1255,7 @@ describe("revertTableResults", () => {
       }],
       phase: "qualifying",
       currentRound: 1,
+      mode: "classic",
       settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
     };
 
@@ -1297,6 +1307,7 @@ describe("revertTableResults", () => {
       }],
       phase: "qualifying",
       currentRound: 1,
+      mode: "classic",
       settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
     };
 
@@ -1377,6 +1388,7 @@ describe("applyResults — wins tracking", () => {
       }],
       phase: "qualifying",
       currentRound: 1,
+      mode: "classic",
       settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
     };
 
@@ -1410,6 +1422,7 @@ describe("applyResults — wins tracking", () => {
       }],
       phase: "qualifying",
       currentRound: 1,
+      mode: "classic",
       settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
     };
 
@@ -1445,6 +1458,7 @@ describe("backfillPlayerWins", () => {
       }],
       phase: "qualifying",
       currentRound: 1,
+      mode: "classic",
       settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
     };
 
@@ -1481,6 +1495,7 @@ describe("backfillPlayerWins", () => {
       ],
       phase: "qualifying",
       currentRound: 2,
+      mode: "classic",
       settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
     };
 
@@ -1502,6 +1517,7 @@ describe("backfillPlayerWins", () => {
       }],
       phase: "qualifying",
       currentRound: 1,
+      mode: "classic",
       settings: { totalQualifyingRounds: 5, topCut: 16, dramaticReveal: false, testMode: false },
     };
 
@@ -1773,5 +1789,218 @@ describe("getStandings — vpSharePct tiebreaker", () => {
 
     const standings = getStandings(players, rounds);
     expect(standings[0].id).toBe("1"); // HighShare wins on VP% (62.5% > 29.4%)
+  });
+});
+
+// ===== COLOSSEUM-SPECIFIC TESTS =====
+
+describe("assignGroups", () => {
+  it("assigns all players to groups of 8", () => {
+    const players = Array.from({ length: 16 }, (_, i) => makePlayer(String(i + 1), `P${i + 1}`, 0, 0, 0));
+    const grouped = assignGroups(players);
+    expect(grouped).toHaveLength(16);
+    // Every player should have a groupId
+    grouped.forEach((p) => {
+      expect(p.groupId).toBeDefined();
+      expect(p.groupId).toBeGreaterThanOrEqual(0);
+      expect(p.groupId).toBeLessThan(2);
+    });
+    // Each group should have exactly 8 players
+    const group0 = grouped.filter((p) => p.groupId === 0);
+    const group1 = grouped.filter((p) => p.groupId === 1);
+    expect(group0).toHaveLength(8);
+    expect(group1).toHaveLength(8);
+  });
+
+  it("assigns 32 players into 4 groups of 8", () => {
+    const players = Array.from({ length: 32 }, (_, i) => makePlayer(String(i + 1), `P${i + 1}`, 0, 0, 0));
+    const grouped = assignGroups(players);
+    for (let g = 0; g < 4; g++) {
+      expect(grouped.filter((p) => p.groupId === g)).toHaveLength(8);
+    }
+  });
+
+  it("produces a random shuffle (not identity)", () => {
+    const players = Array.from({ length: 16 }, (_, i) => makePlayer(String(i + 1), `P${i + 1}`, 0, 0, 0));
+    // Run multiple times and check that at least one result differs from sorted order
+    let sawDifferent = false;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const grouped = assignGroups(players);
+      const ids = grouped.map((p) => p.id);
+      if (ids.some((id, i) => id !== String(i + 1))) {
+        sawDifferent = true;
+        break;
+      }
+    }
+    expect(sawDifferent).toBe(true);
+  });
+});
+
+describe("generateColosseumPairing", () => {
+  function makeColosseumState(numPlayers: number): TournamentState {
+    const players = Array.from({ length: numPlayers }, (_, i) => ({
+      ...makePlayer(String(i + 1), `P${i + 1}`, 0, 0, 0),
+      groupId: Math.floor(i / 8),
+    }));
+    return {
+      metadata: { version: "1.0.0", timestamp: "", tournamentName: "Test" },
+      players,
+      rounds: [],
+      phase: "qualifying",
+      currentRound: 0,
+      mode: "colosseum",
+      settings: { totalQualifyingRounds: 4, topCut: 16, dramaticReveal: false, testMode: false },
+    };
+  }
+
+  it("generates 2 tables per group per round (16 players = 4 tables)", () => {
+    const state = makeColosseumState(16);
+    const tables = generateColosseumPairing(state);
+    expect(tables).toHaveLength(4); // 2 groups × 2 tables
+  });
+
+  it("generates 16 tables for 64 players (8 groups)", () => {
+    const state = makeColosseumState(64);
+    const tables = generateColosseumPairing(state);
+    expect(tables).toHaveLength(16); // 8 groups × 2 tables
+  });
+
+  it("each table has exactly 4 players", () => {
+    const state = makeColosseumState(32);
+    const tables = generateColosseumPairing(state);
+    tables.forEach((t) => {
+      expect(t.playerIds).toHaveLength(4);
+    });
+  });
+
+  it("all tables are incomplete with no results", () => {
+    const state = makeColosseumState(16);
+    const tables = generateColosseumPairing(state);
+    tables.forEach((t) => {
+      expect(t.isComplete).toBe(false);
+      expect(t.results).toHaveLength(0);
+    });
+  });
+
+  it("table IDs are sequential starting from 1", () => {
+    const state = makeColosseumState(32);
+    const tables = generateColosseumPairing(state);
+    tables.forEach((t, i) => {
+      expect(t.id).toBe(i + 1);
+    });
+  });
+
+  it("players from the same group play within the group (no cross-group)", () => {
+    const state = makeColosseumState(32);
+    const tables = generateColosseumPairing(state);
+    for (const table of tables) {
+      const groups = table.playerIds.map((pid) => {
+        const player = state.players.find((p) => p.id === pid);
+        return player?.groupId;
+      });
+      // All players in a table should be from the same group
+      const uniqueGroups = new Set(groups);
+      expect(uniqueGroups.size).toBe(1);
+    }
+  });
+
+  it("different rounds produce different table compositions", () => {
+    const state0 = makeColosseumState(16);
+    const tables0 = generateColosseumPairing(state0);
+
+    const state1 = { ...state0, currentRound: 1 };
+    const tables1 = generateColosseumPairing(state1);
+
+    // At least one table should have different players
+    const t0PlayerSets = tables0.map((t) => t.playerIds.sort().join(","));
+    const t1PlayerSets = tables1.map((t) => t.playerIds.sort().join(","));
+    const allSame = t0PlayerSets.every((s) => t1PlayerSets.includes(s));
+    expect(allSame).toBe(false);
+  });
+
+  it("covers all 4 rounds of the schedule without error", () => {
+    const baseState = makeColosseumState(16);
+    for (let round = 0; round < 4; round++) {
+      const state = { ...baseState, currentRound: round };
+      const tables = generateColosseumPairing(state);
+      expect(tables.length).toBeGreaterThan(0);
+      // Every player should appear in exactly one table
+      const allPlayerIds = tables.flatMap((t) => t.playerIds);
+      const uniqueIds = new Set(allPlayerIds);
+      expect(uniqueIds.size).toBe(16);
+      expect(allPlayerIds).toHaveLength(16);
+    }
+  });
+});
+
+describe("generateRandomTableResults — Colosseum mode", () => {
+  it("includes seatPosition and pickOrder in Colosseum mode", () => {
+    const table: Table = {
+      id: 1,
+      playerIds: ["1", "2", "3", "4"],
+      results: [],
+      isComplete: false,
+    };
+    const results = generateRandomTableResults(table, undefined, "colosseum");
+    results.forEach((r) => {
+      expect(r.seatPosition).toBeDefined();
+      expect(r.seatPosition).toBeGreaterThanOrEqual(1);
+      expect(r.seatPosition).toBeLessThanOrEqual(4);
+      expect(r.pickOrder).toBeDefined();
+      expect(r.pickOrder).toBeGreaterThanOrEqual(1);
+      expect(r.pickOrder).toBeLessThanOrEqual(4);
+    });
+  });
+
+  it("seatPositions are unique within a table", () => {
+    const table: Table = {
+      id: 1,
+      playerIds: ["1", "2", "3", "4"],
+      results: [],
+      isComplete: false,
+    };
+    const results = generateRandomTableResults(table, undefined, "colosseum");
+    const seats = results.map((r) => r.seatPosition!);
+    expect(new Set(seats).size).toBe(4);
+  });
+
+  it("pickOrders are unique within a table", () => {
+    const table: Table = {
+      id: 1,
+      playerIds: ["1", "2", "3", "4"],
+      results: [],
+      isComplete: false,
+    };
+    const results = generateRandomTableResults(table, undefined, "colosseum");
+    const picks = results.map((r) => r.pickOrder!);
+    expect(new Set(picks).size).toBe(4);
+  });
+
+  it("does NOT include seatPosition/pickOrder in Classic mode", () => {
+    const table: Table = {
+      id: 1,
+      playerIds: ["1", "2", "3", "4"],
+      results: [],
+      isComplete: false,
+    };
+    const results = generateRandomTableResults(table, undefined, "classic");
+    results.forEach((r) => {
+      expect(r.seatPosition).toBeUndefined();
+      expect(r.pickOrder).toBeUndefined();
+    });
+  });
+
+  it("defaults to Classic mode when mode is omitted", () => {
+    const table: Table = {
+      id: 1,
+      playerIds: ["1", "2", "3", "4"],
+      results: [],
+      isComplete: false,
+    };
+    const results = generateRandomTableResults(table);
+    results.forEach((r) => {
+      expect(r.seatPosition).toBeUndefined();
+      expect(r.pickOrder).toBeUndefined();
+    });
   });
 });

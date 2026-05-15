@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { X, Users, Play, FlaskConical } from "lucide-react";
 import { SandwormRegistration } from "../components/animations/SandwormRegistration";
 import { generateTestPlayerNames } from "../engine/testUtils";
-import type { Player } from "../engine/types";
+import type { Player, TournamentMode } from "../engine/types";
 
 const INTRO_VIDEO_EMBED_URL =
   "https://www.canva.com/design/DAHCwjWwmKc/IU6i6iu-jQcoAxraRjjjPg/view?embed";
@@ -14,6 +14,7 @@ interface RegistrationPageProps {
   onRemovePlayer: (id: string) => void;
   onStart: () => void;
   testMode: boolean;
+  mode: TournamentMode;
 }
 
 export function RegistrationPage({
@@ -22,8 +23,12 @@ export function RegistrationPage({
   onRemovePlayer,
   onStart,
   testMode,
+  mode,
 }: RegistrationPageProps) {
-  const canStart = players.length >= 4 && players.length % 4 === 0;
+  const isColosseum = mode === "colosseum";
+  const canStart = isColosseum
+    ? players.length >= 16 && players.length % 8 === 0
+    : players.length >= 4 && players.length % 4 === 0;
   const [showVideo, setShowVideo] = useState(false);
   const [testPlayerCount, setTestPlayerCount] = useState(20);
 
@@ -197,20 +202,28 @@ export function RegistrationPage({
           </button>
           <p className="text-xs text-sand-dark mt-3 uppercase tracking-widest">
             {players.length} players &middot;{" "}
-            {players.length / 4} table{players.length / 4 > 1 ? "s" : ""} of 4
+            {isColosseum
+              ? `${players.length / 8} group${players.length / 8 > 1 ? "s" : ""} of 8`
+              : `${players.length / 4} table${players.length / 4 > 1 ? "s" : ""} of 4`}
           </p>
         </motion.div>
       )}
 
-      {/* Hint when player count is not divisible by 4 */}
-      {players.length >= 4 && !canStart && (
+      {/* Hint when player count doesn't meet mode requirements */}
+      {players.length > 0 && !canStart && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="text-center"
         >
           <p className="text-xs text-spice uppercase tracking-widest">
-            Add {4 - (players.length % 4)} more player{4 - (players.length % 4) > 1 ? "s" : ""} to fill all tables of 4
+            {isColosseum
+              ? players.length < 16
+                ? `Need at least 16 players (${16 - players.length} more)`
+                : `Add ${8 - (players.length % 8)} more player${8 - (players.length % 8) > 1 ? "s" : ""} to fill all groups of 8`
+              : players.length < 4
+                ? `Need at least 4 players (${4 - players.length} more)`
+                : `Add ${4 - (players.length % 4)} more player${4 - (players.length % 4) > 1 ? "s" : ""} to fill all tables of 4`}
           </p>
         </motion.div>
       )}

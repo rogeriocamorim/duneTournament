@@ -4,12 +4,15 @@ import { TableCard } from "../components/TableCard";
 import { DramaticReveal } from "../components/DramaticReveal";
 import { Leaderboard } from "../components/Leaderboard";
 import { LeaderStatsPanel } from "../components/LeaderStatsPanel";
+import { GroupStandings } from "../components/GroupStandings";
+import { SeatPickStatsPanel } from "../components/SeatPickStatsPanel";
 import { RoundHistory } from "../components/RoundHistory";
 import { LeaderReveal } from "../components/animations/LeaderReveal";
 import type { TournamentState, TableResult } from "../engine/types";
 import { getLeaderInfo, getLeaderImageUrl } from "../engine/types";
 import { generateRandomTableResults } from "../engine/testUtils";
-import { Trophy, Swords, BarChart3, Crown, Eye, FlaskConical, History } from "lucide-react";
+import { exportGroupsCSV } from "../utils/csvExport";
+import { Trophy, Swords, BarChart3, Crown, Eye, FlaskConical, History, Users, Armchair, Download } from "lucide-react";
 
 interface DashboardPageProps {
   state: TournamentState;
@@ -21,7 +24,7 @@ interface DashboardPageProps {
   testMode: boolean;
 }
 
-type TabView = "tables" | "standings" | "leaders" | "history";
+type TabView = "tables" | "groups" | "standings" | "leaders" | "seats" | "history";
 
 export function DashboardPage({
   state,
@@ -41,16 +44,39 @@ export function DashboardPage({
   const containerRef = useRef<HTMLDivElement>(null);
   const lastRevealedRound = useRef<number>(0);
 
-  const currentRound = state.rounds[state.rounds.length - 1];
+  const isColosseum = state.mode === "colosseum";
+
+  // Colosseum: navigate between pre-generated rounds (0-indexed into state.rounds)
+  const [displayRoundIndex, setDisplayRoundIndex] = useState(() => {
+    if (!isColosseum || state.rounds.length === 0) return 0;
+    const firstIncomplete = state.rounds.findIndex((r) => !r.isComplete);
+    return firstIncomplete >= 0 ? firstIncomplete : state.rounds.length - 1;
+  });
+
+  // Classic: always show latest round; Colosseum: show selected round
+  const activeRoundIndex = isColosseum
+    ? Math.min(displayRoundIndex, Math.max(0, state.rounds.length - 1))
+    : state.rounds.length - 1;
+  const currentRound = state.rounds[activeRoundIndex];
+
   const completedQualifying = state.rounds.filter(
     (r) => r.type === "qualifying" && r.isComplete
   ).length;
-  const needsNewRound = !currentRound || currentRound.isComplete;
+  const needsNewRound = !isColosseum && (!currentRound || currentRound.isComplete);
   const qualifyingDone =
     completedQualifying >= state.settings.totalQualifyingRounds;
 
+  // When navigating rounds in Colosseum, skip reveal for already-viewed/complete rounds
+  useEffect(() => {
+    if (isColosseum && currentRound) {
+      if (currentRound.isComplete || currentRound.number <= lastRevealedRound.current) {
+        setLeaderRevealDone(true);
+        setTablesRevealed(true);
+      }
+    }
+  }, [isColosseum, displayRoundIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-show leader reveal when a new incomplete round with leaders appears
-  // (covers Round 1 generated at tournament start and page refreshes)
   useEffect(() => {
     if (
       dramaticReveal &&
@@ -68,18 +94,17 @@ export function DashboardPage({
 
   const handleAutoFillResults = useCallback(() => {
     if (!currentRound) return;
-    const roundIndex = state.rounds.length - 1;
     const batch: { tableId: number; results: TableResult[] }[] = [];
     for (const table of currentRound.tables) {
       if (!table.isComplete) {
-        const results = generateRandomTableResults(table, currentRound.availableLeaders);
+        const results = generateRandomTableResults(table, currentRound.availableLeaders, state.mode);
         batch.push({ tableId: table.id, results });
       }
     }
     if (batch.length > 0) {
-      onBatchSubmitResults(roundIndex, batch);
+      onBatchSubmitResults(activeRoundIndex, batch);
     }
-  }, [currentRound, state.rounds.length, onBatchSubmitResults]);
+  }, [currentRound, activeRoundIndex, onBatchSubmitResults, state.mode]);
 
   const handleGenerateRound = useCallback(() => {
     // Trigger explosion
@@ -134,11 +159,24 @@ export function DashboardPage({
           </span>
           <span className="text-spice">|</span>
           <span className="text-spice">{state.phase}</span>
+          {isColosseum && (
+            <>
+              <span className="text-spice">|</span>
+              <button
+                onClick={() => exportGroupsCSV(state)}
+                className="inline-flex items-center gap-1 text-sand-dark hover:text-fremen-blue transition-colors"
+                title="Export Group Standings (XLSX)"
+              >
+                <Download size={12} />
+                Export
+              </button>
+            </>
+          )}
         </div>
       </motion.div>
 
       {/* Tab Navigation */}
-      <div className="flex justify-center gap-4 mb-8">
+      <div className="flex justify-center gap-4 mb-8 flex-wrap">
         <button
           onClick={() => setActiveTab("tables")}
           className={`flex items-center gap-2 px-4 py-2 text-sm uppercase tracking-widest transition-all ${
@@ -150,6 +188,19 @@ export function DashboardPage({
           <Swords size={16} />
           Tables
         </button>
+        {isColosseum && (
+          <button
+            onClick={() => setActiveTab("groups")}
+            className={`flex items-center gap-2 px-4 py-2 text-sm uppercase tracking-widest transition-all ${
+              activeTab === "groups"
+                ? "text-spice border-b-2 border-spice"
+                : "text-sand-dark hover:text-sand"
+            }`}
+          >
+            <Users size={16} />
+            Groups
+          </button>
+        )}
         <button
           onClick={() => setActiveTab("standings")}
           className={`flex items-center gap-2 px-4 py-2 text-sm uppercase tracking-widest transition-all ${
@@ -172,6 +223,19 @@ export function DashboardPage({
           <Crown size={16} />
           Leaders
         </button>
+        {isColosseum && (
+          <button
+            onClick={() => setActiveTab("seats")}
+            className={`flex items-center gap-2 px-4 py-2 text-sm uppercase tracking-widest transition-all ${
+              activeTab === "seats"
+                ? "text-spice border-b-2 border-spice"
+                : "text-sand-dark hover:text-sand"
+            }`}
+          >
+            <Armchair size={16} />
+            Seats
+          </button>
+        )}
         {state.rounds.filter((r) => r.isComplete).length > 1 && (
           <button
             onClick={() => setActiveTab("history")}
@@ -207,8 +271,41 @@ export function DashboardPage({
       {/* Content */}
       {activeTab === "tables" && (
         <div>
-          {/* Generate Round / Advance */}
-          {needsNewRound && !qualifyingDone && (
+          {/* Colosseum: Round Navigation */}
+          {isColosseum && state.rounds.length > 0 && (
+            <div className="flex justify-center gap-2 mb-6">
+              {state.rounds
+                .filter((r) => r.type === "qualifying")
+                .map((round, idx) => {
+                  const isActive = idx === displayRoundIndex;
+                  const isComplete = round.isComplete;
+                  const inProgress =
+                    !isComplete && round.tables.some((t) => t.isComplete);
+                  return (
+                    <button
+                      key={round.number}
+                      onClick={() => setDisplayRoundIndex(idx)}
+                      className={`px-4 py-2 text-xs uppercase tracking-widest rounded-sm border transition-all ${
+                        isActive
+                          ? "border-spice bg-spice/20 text-spice"
+                          : isComplete
+                          ? "border-spice/30 text-spice/60 hover:border-spice/50"
+                          : inProgress
+                          ? "border-fremen-blue/40 text-fremen-blue hover:border-fremen-blue/60"
+                          : "border-white/10 text-sand-dark hover:border-white/20"
+                      }`}
+                    >
+                      R{round.number}
+                      {isComplete && " \u2713"}
+                      {inProgress && !isComplete && " \u25CF"}
+                    </button>
+                  );
+                })}
+            </div>
+          )}
+
+          {/* Classic: Generate Round / Advance */}
+          {!isColosseum && needsNewRound && !qualifyingDone && (
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -238,13 +335,15 @@ export function DashboardPage({
                   Qualifying Complete
                 </h2>
                 <p className="text-sm text-sand-dark mb-4">
-                  The top 16 players advance to the Landsraad Finals.
+                  {isColosseum
+                    ? "The top players from each group advance to the Knockout Stage."
+                    : "The top 16 players advance to the Landsraad Finals."}
                 </p>
                 <button
                   onClick={onStartTop8}
                   className="btn-imperial-filled py-3 px-8"
                 >
-                  Begin the Landsraad
+                  {isColosseum ? "Begin Knockout Draw" : "Begin the Landsraad"}
                 </button>
               </div>
             </motion.div>
@@ -281,16 +380,18 @@ export function DashboardPage({
                 enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
                 labels={currentRound.tables.map((t) => `Table #${t.id}`)}
                 onAllRevealed={() => setTablesRevealed(true)}
+                gridClass={isColosseum ? "grid grid-cols-1 gap-4 max-w-2xl mx-auto" : "grid grid-cols-1 md:grid-cols-2 gap-4"}
                 items={currentRound.tables.map((table, index) => (
                   <TableCard
                     key={`r${currentRound.number}-t${table.id}`}
                     table={table}
                     players={state.players}
-                    roundIndex={state.rounds.length - 1}
+                    roundIndex={activeRoundIndex}
                     onSubmitResults={onSubmitResults}
                     animationDelay={dramaticReveal ? 0 : index}
                     allowEdit
                     availableLeaders={currentRound.availableLeaders}
+                    mode={state.mode}
                   />
                 ))}
               />
@@ -349,11 +450,23 @@ export function DashboardPage({
               className="text-center mt-4"
             >
               <p className="text-sm text-sand-dark uppercase tracking-widest">
-                Round {currentRound.number} Complete &mdash; Review results above or generate the next round
+                Round {currentRound.number} Complete &mdash;{" "}
+                {isColosseum
+                  ? "Navigate to the next round above"
+                  : "Review results above or generate the next round"}
               </p>
             </motion.div>
           )}
         </div>
+      )}
+
+      {activeTab === "groups" && isColosseum && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <GroupStandings players={state.players} rounds={state.rounds} />
+        </motion.div>
       )}
 
       {activeTab === "standings" && (
@@ -375,6 +488,15 @@ export function DashboardPage({
           animate={{ opacity: 1, y: 0 }}
         >
           <LeaderStatsPanel rounds={state.rounds} />
+        </motion.div>
+      )}
+
+      {activeTab === "seats" && isColosseum && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <SeatPickStatsPanel rounds={state.rounds} />
         </motion.div>
       )}
 

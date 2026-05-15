@@ -25,6 +25,82 @@ export function initializePlayerIds(players: Player[]): void {
 
 // ===== PAIRING ENGINE =====
 
+// ── Colosseum Group Schedule ──
+
+/**
+ * Colosseum Fixed Group Schedule (8 players per group).
+ *
+ * Each group has 8 players (P1–P8) seated across 4 rounds.
+ * The schedule guarantees no two players share a table more than twice.
+ *
+ * Round 1: [P1,P2,P3,P4] vs [P5,P6,P7,P8]
+ * Round 2: [P1,P2,P5,P6] vs [P3,P4,P7,P8]
+ * Round 3: [P1,P3,P5,P7] vs [P2,P4,P6,P8]
+ * Round 4: [P1,P4,P6,P7] vs [P2,P3,P5,P8]
+ */
+const GROUP_SCHEDULE: [number[], number[]][] = [
+  [[0,1,2,3],[4,5,6,7]],
+  [[0,1,4,5],[2,3,6,7]],
+  [[0,2,4,6],[1,3,5,7]],
+  [[0,3,5,6],[1,2,4,7]],
+];
+
+/** Assign players randomly into groups of 8. */
+export function assignGroups(players: Player[]): Player[] {
+  const shuffled = [...players];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled.map((p, i) => ({ ...p, groupId: Math.floor(i / 8) }));
+}
+
+/**
+ * Generate tables for a given round using the fixed Colosseum group schedule.
+ * All groups run simultaneously; each group contributes 2 tables per round.
+ */
+export function generateColosseumPairing(state: TournamentState): Table[] {
+  const roundIndex = state.currentRound; // 0-based, rounds 0-3
+  const schedule = GROUP_SCHEDULE[roundIndex % GROUP_SCHEDULE.length];
+
+  // Group players by groupId
+  const groups = new Map<number, Player[]>();
+  for (const p of state.players) {
+    const gid = p.groupId ?? 0;
+    if (!groups.has(gid)) groups.set(gid, []);
+    groups.get(gid)!.push(p);
+  }
+
+  const tables: Table[] = [];
+  let tableId = 1;
+
+  const sortedGroupIds = [...groups.keys()].sort((a, b) => a - b);
+
+  for (const gid of sortedGroupIds) {
+    const groupPlayers = groups.get(gid)!;
+    groupPlayers.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+
+    for (const [seatSetA, seatSetB] of [schedule]) {
+      tables.push({
+        id: tableId++,
+        playerIds: seatSetA.map((seat) => groupPlayers[seat]?.id).filter(Boolean),
+        results: [],
+        isComplete: false,
+      });
+      tables.push({
+        id: tableId++,
+        playerIds: seatSetB.map((seat) => groupPlayers[seat]?.id).filter(Boolean),
+        results: [],
+        isComplete: false,
+      });
+    }
+  }
+
+  return tables;
+}
+
+// ── Classic Swiss Pairing ──
+
 /**
  * Golf-style pairing: rank players by standings, then snake-draft across
  * tables so each table gets a mix of top, middle, and bottom players.

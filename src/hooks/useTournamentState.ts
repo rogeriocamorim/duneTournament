@@ -1,10 +1,12 @@
 import { useReducer, useCallback, useEffect } from "react";
-import type { TournamentState, Round, TableResult } from "../engine/types";
+import type { TournamentState, TournamentMode, Round, TableResult } from "../engine/types";
 import { DEFAULT_STATE } from "../engine/types";
 import {
   createPlayer,
   initializePlayerIds,
   generateSwissPairing,
+  generateColosseumPairing,
+  assignGroups,
   generateSemifinals,
   generateFinalsRound6,
   generateGrandFinal,
@@ -28,6 +30,7 @@ const STORAGE_KEY = "dune_tournament_state";
 // ===== ACTIONS =====
 
 type Action =
+  | { type: "SELECT_MODE"; mode: TournamentMode }
   | { type: "ADD_PLAYER"; name: string }
   | { type: "REMOVE_PLAYER"; id: string }
   | { type: "SET_TOURNAMENT_NAME"; name: string }
@@ -41,12 +44,31 @@ type Action =
   | { type: "TOGGLE_DRAMATIC_REVEAL" }
   | { type: "TOGGLE_TEST_MODE" }
   | { type: "SET_JSONBIN_INFO"; binId: string; binKey: string }
+  // ── Colosseum-specific actions ──
+  | { type: "SET_GROUP_ASSIGNMENTS"; assignments: Map<string, number> }
+  | { type: "PROCEED_TO_QUALIFYING" }
+  | { type: "START_KNOCKOUT_DRAW" }
+  | { type: "CONFIRM_KNOCKOUT_DRAW"; tables: string[][] }
   | { type: "RESET" };
 
 // ===== REDUCER =====
 
 function tournamentReducer(state: TournamentState, action: Action): TournamentState {
   switch (action.type) {
+    case "SELECT_MODE": {
+      const tournamentName = action.mode === "colosseum"
+        ? "The Colosseum \u2014 Uprising \u2022 Bloodlines"
+        : "Dune Bloodlines Open";
+      const totalQualifyingRounds = action.mode === "colosseum" ? 4 : 5;
+      return {
+        ...state,
+        mode: action.mode,
+        phase: "registration",
+        metadata: { ...state.metadata, tournamentName, timestamp: new Date().toISOString() },
+        settings: { ...state.settings, totalQualifyingRounds },
+      };
+    }
+
     case "ADD_PLAYER": {
       const player = createPlayer(action.name);
       return {
@@ -71,6 +93,18 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
     }
 
     case "START_TOURNAMENT": {
+      if (state.mode === "colosseum") {
+        // Colosseum: need multiples of 8, minimum 16
+        if (state.players.length < 16 || state.players.length % 8 !== 0) return state;
+        const groupedPlayers = assignGroups(state.players);
+        return {
+          ...state,
+          players: groupedPlayers,
+          phase: "group-draw",
+          currentRound: 0,
+        };
+      }
+      // Classic: need multiples of 4
       if (state.players.length < 4 || state.players.length % 4 !== 0) return state;
       return {
         ...state,
@@ -107,35 +141,33 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
       const table = round.tables.find((t) => t.id === action.tableId);
       if (!table) return state;
 
-      // If this table was previously complete and scored, revert old scoring first
-      const wasRoundComplete = round.isComplete;
-      if (table.isComplete && table.results.length > 0 && wasRoundComplete) {
+      // If this table was previously complete, revert old scoring first
+      if (table.isComplete && table.results.length > 0) {
         newState = revertTableResults(newState, action.roundIndex, action.tableId);
-        // Re-read table reference after revert (structuredClone in revert)
         const revertedRound = newState.rounds[action.roundIndex];
         const revertedTable = revertedRound.tables.find((t) => t.id === action.tableId);
         if (revertedTable) {
           revertedTable.results = action.results;
           revertedTable.isComplete = true;
         }
-        // Re-check round completeness
         revertedRound.isComplete = revertedRound.tables.every((t) => t.isComplete);
         // Apply new scoring for this table
-        if (revertedRound.isComplete) {
-          newState = applyTableResults(newState, action.roundIndex, action.tableId);
-        }
+        newState = applyTableResults(newState, action.roundIndex, action.tableId);
         return newState;
       }
 
       table.results = action.results;
       table.isComplete = true;
-
-      // Check if all tables in round are complete
       round.isComplete = round.tables.every((t) => t.isComplete);
 
-      // If round is complete, apply results for ALL tables
-      if (round.isComplete) {
-        return applyResults(newState, action.roundIndex);
+      if (state.mode === "colosseum") {
+        // Colosseum: apply scoring per-table immediately
+        newState = applyTableResults(newState, action.roundIndex, action.tableId);
+      } else {
+        // Classic: apply results for ALL tables only when round is complete
+        if (round.isComplete) {
+          return applyResults(newState, action.roundIndex);
+        }
       }
 
       return newState;
@@ -163,6 +195,11 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
     }
 
     case "START_TOP8": {
+      if (state.mode === "colosseum") {
+        // Colosseum: go to knockout draw phase
+        return { ...state, phase: "knockout-draw" };
+      }
+      // Classic: generate semifinal tables directly
       const tables = generateSemifinals(state);
       if (tables.length === 0) return state;
 
@@ -188,28 +225,103 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
       if (!lastRound || !lastRound.isComplete) return state;
 
       if (lastRound.type === "semifinal") {
-        // Generate 3 Redemption tables: bye (2p) + 2 Lower Finals (4p each)
-        const tables = generateFinalsRound6(lastRound);
+        if (state.mode === "colosseum") {
+          // Colosseum SF2: collect losers from SF1 + eliminator winners
+          const sortByResult = (table: { results: TableResult[] }) =>
+            [...table.results].sort((a, b) => a.position - b.position);
+
+          // SF1A and SF1B are tables 1,2; ElimA and ElimB are tables 3,4
+          const sf1a = lastRound.tables[0];
+          const sf1b = lastRound.tables[1];
+          const elimA = lastRound.tables[2];
+          const elimB = lastRound.tables[3];
+
+          const sf1aLosers = sortByResult(sf1a).slice(1).map((r) => r.playerId);
+          const sf1bLosers = sortByResult(sf1b).slice(1).map((r) => r.playerId);
+          const elimAWinner = sortByResult(elimA)[0].playerId;
+          const elimBWinner = sortByResult(elimB)[0].playerId;
+
+          // 8 players → 2 tables of 4
+          const pool = [...sf1aLosers, ...sf1bLosers, elimAWinner, elimBWinner];
+          // Shuffle for randomness
+          for (let i = pool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [pool[i], pool[j]] = [pool[j], pool[i]];
+          }
+          const sf2Tables = [
+            { id: 1, playerIds: pool.slice(0, 4), results: [] as TableResult[], isComplete: false },
+            { id: 2, playerIds: pool.slice(4, 8), results: [] as TableResult[], isComplete: false },
+          ];
+          const bLeaders = selectRoundLeaders("B");
+          const newRound: Round = {
+            number: state.rounds.length + 1,
+            tables: sf2Tables,
+            isComplete: false,
+            type: "winners-final",
+            availableLeaders: bLeaders.map((l) => l.name),
+            leaderTier: "B",
+          };
+          return {
+            ...state,
+            rounds: [...state.rounds, newRound],
+            currentRound: newRound.number,
+          };
+        }
+        // Classic: Generate 3 Redemption tables: bye (2p) + 2 Lower Finals (4p each)
+        const redemptionTables = generateFinalsRound6(lastRound);
         // Auto-mark bye table (table 1) as complete — no game played
-        tables[0].isComplete = true;
-        const cLeaders = selectRoundLeaders("C");
-        const newRound: Round = {
+        redemptionTables[0].isComplete = true;
+        const cLeadersRedemption = selectRoundLeaders("C");
+        const redemptionRound: Round = {
           number: state.rounds.length + 1,
-          tables,
+          tables: redemptionTables,
           isComplete: false,
           type: "winners-final",
-          availableLeaders: cLeaders.map((l) => l.name),
+          availableLeaders: cLeadersRedemption.map((l) => l.name),
           leaderTier: "C",
         };
         return {
           ...state,
-          rounds: [...state.rounds, newRound],
-          currentRound: newRound.number,
+          rounds: [...state.rounds, redemptionRound],
+          currentRound: redemptionRound.number,
         };
       }
 
       if (lastRound.type === "winners-final") {
-        // Generate Grand Final: Finalists from bye table + Lower Final winners
+        if (state.mode === "colosseum") {
+          // Colosseum Grand Final: SF1A winner + SF1B winner + SF2A winner + SF2B winner
+          const sfRound = state.rounds.find((r) => r.type === "semifinal");
+          if (!sfRound) return state;
+          const sortByResult = (table: { results: TableResult[] }) =>
+            [...table.results].sort((a, b) => a.position - b.position);
+
+          const sf1aWinner = sortByResult(sfRound.tables[0])[0].playerId;
+          const sf1bWinner = sortByResult(sfRound.tables[1])[0].playerId;
+          const sf2aWinner = sortByResult(lastRound.tables[0])[0].playerId;
+          const sf2bWinner = sortByResult(lastRound.tables[1])[0].playerId;
+
+          const grandFinalTable = {
+            id: 1,
+            playerIds: [sf1aWinner, sf1bWinner, sf2aWinner, sf2bWinner],
+            results: [] as TableResult[],
+            isComplete: false,
+          };
+          const cLeadersGF = selectRoundLeaders("C");
+          const gfRound: Round = {
+            number: state.rounds.length + 1,
+            tables: [grandFinalTable],
+            isComplete: false,
+            type: "grand-final",
+            availableLeaders: cLeadersGF.map((l) => l.name),
+            leaderTier: "C",
+          };
+          return {
+            ...state,
+            rounds: [...state.rounds, gfRound],
+            currentRound: gfRound.number,
+          };
+        }
+        // Classic: Generate Grand Final from Redemption round
         const grandFinalTable = generateGrandFinal(lastRound);
         const grandFinalTier = randomTier();
         const grandFinalLeaders = selectRoundLeaders(grandFinalTier);
@@ -243,6 +355,10 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
         p.wins = p.wins ?? 0;
       }
       backfillPlayerWins(action.state);
+      // Backfill mode for old states without it
+      if (!action.state.mode) {
+        action.state.mode = "classic";
+      }
       return action.state;
     }
 
@@ -277,6 +393,105 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
       };
     }
 
+    // ── Colosseum-specific actions ──
+
+    case "SET_GROUP_ASSIGNMENTS": {
+      if (state.mode !== "colosseum") return state;
+      // Apply manual group assignments from spinner wheel
+      const newPlayers = state.players.map((p) => ({
+        ...p,
+        groupId: action.assignments.get(p.id) ?? p.groupId ?? 0,
+      }));
+
+      // Pre-generate all 4 qualifying rounds
+      const rounds: Round[] = [];
+      let tempState: TournamentState = { ...state, players: newPlayers, currentRound: 0 };
+      for (let i = 0; i < 4; i++) {
+        tempState = { ...tempState, currentRound: i };
+        const tables = generateColosseumPairing(tempState);
+        const roundNumber = i + 1;
+        const tierCycle: ("B" | "C" | "A")[] = ["B", "C", "A", "B"];
+        const tier = tierCycle[i];
+        const leaders = selectRoundLeaders(tier);
+        rounds.push({
+          number: roundNumber,
+          tables,
+          isComplete: false,
+          type: "qualifying",
+          availableLeaders: leaders.map((l) => l.name),
+          leaderTier: tier,
+        });
+      }
+
+      return {
+        ...state,
+        players: newPlayers,
+        rounds,
+        phase: "qualifying",
+        currentRound: 1,
+      };
+    }
+
+    case "PROCEED_TO_QUALIFYING": {
+      if (state.mode !== "colosseum") return state;
+      // Use existing group assignments to pre-generate all 4 rounds
+      const rounds: Round[] = [];
+      let tempState: TournamentState = { ...state, currentRound: 0 };
+      for (let i = 0; i < 4; i++) {
+        tempState = { ...tempState, currentRound: i };
+        const tables = generateColosseumPairing(tempState);
+        const roundNumber = i + 1;
+        const tierCycle: ("B" | "C" | "A")[] = ["B", "C", "A", "B"];
+        const tier = tierCycle[i];
+        const leaders = selectRoundLeaders(tier);
+        rounds.push({
+          number: roundNumber,
+          tables,
+          isComplete: false,
+          type: "qualifying",
+          availableLeaders: leaders.map((l) => l.name),
+          leaderTier: tier,
+        });
+      }
+      return {
+        ...state,
+        rounds,
+        phase: "qualifying",
+        currentRound: 1,
+      };
+    }
+
+    case "START_KNOCKOUT_DRAW": {
+      if (state.mode !== "colosseum") return state;
+      return { ...state, phase: "knockout-draw" };
+    }
+
+    case "CONFIRM_KNOCKOUT_DRAW": {
+      if (state.mode !== "colosseum") return state;
+      // action.tables: array of 4 arrays of player IDs (SF1A, SF1B, ElimA, ElimB)
+      const knockoutTables = action.tables.map((playerIds, idx) => ({
+        id: idx + 1,
+        playerIds,
+        results: [],
+        isComplete: false,
+      }));
+      const aLeaders = selectRoundLeaders("A");
+      const newRound: Round = {
+        number: state.rounds.length + 1,
+        tables: knockoutTables,
+        isComplete: false,
+        type: "semifinal",
+        availableLeaders: aLeaders.map((l) => l.name),
+        leaderTier: "A",
+      };
+      return {
+        ...state,
+        rounds: [...state.rounds, newRound],
+        currentRound: newRound.number,
+        phase: "top8",
+      };
+    }
+
     case "RESET": {
       return { ...DEFAULT_STATE, metadata: { ...DEFAULT_STATE.metadata, timestamp: new Date().toISOString() } };
     }
@@ -306,6 +521,15 @@ function loadState(): TournamentState {
         backfillPlayerWins(parsed);
       }
 
+      // Backfill mode for old states without it
+      if (!parsed.mode) {
+        parsed.mode = "classic";
+      }
+      // Backfill phase for old states that don't have "home"
+      if (parsed.phase === "registration" && parsed.players.length === 0 && !parsed.mode) {
+        parsed.phase = "home";
+      }
+
       return parsed;
     }
   } catch {
@@ -323,6 +547,10 @@ export function useTournamentState() {
   }, [state]);
 
   // ===== Action creators =====
+
+  const selectMode = useCallback((mode: TournamentMode) => {
+    dispatch({ type: "SELECT_MODE", mode });
+  }, []);
 
   const addPlayer = useCallback((name: string) => {
     dispatch({ type: "ADD_PLAYER", name });
@@ -380,6 +608,24 @@ export function useTournamentState() {
 
   const toggleTestMode = useCallback(() => {
     dispatch({ type: "TOGGLE_TEST_MODE" });
+  }, []);
+
+  // ── Colosseum-specific action creators ──
+
+  const setGroupAssignments = useCallback((assignments: Map<string, number>) => {
+    dispatch({ type: "SET_GROUP_ASSIGNMENTS", assignments });
+  }, []);
+
+  const proceedToQualifying = useCallback(() => {
+    dispatch({ type: "PROCEED_TO_QUALIFYING" });
+  }, []);
+
+  const startKnockoutDraw = useCallback(() => {
+    dispatch({ type: "START_KNOCKOUT_DRAW" });
+  }, []);
+
+  const confirmKnockoutDraw = useCallback((tables: string[][]) => {
+    dispatch({ type: "CONFIRM_KNOCKOUT_DRAW", tables });
   }, []);
 
   const standings = state.phase === "finished"
@@ -454,6 +700,7 @@ export function useTournamentState() {
   return {
     state,
     standings,
+    selectMode,
     addPlayer,
     removePlayer,
     setTournamentName,
@@ -469,5 +716,10 @@ export function useTournamentState() {
     toggleDramaticReveal,
     toggleTestMode,
     generateShareableLink,
+    // Colosseum-specific
+    setGroupAssignments,
+    proceedToQualifying,
+    startKnockoutDraw,
+    confirmKnockoutDraw,
   };
 }
