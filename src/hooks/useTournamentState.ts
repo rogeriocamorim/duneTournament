@@ -510,6 +510,13 @@ function loadState(): TournamentState {
       if (parsed.phase === "registration" && parsed.players.length === 0 && !parsed.mode) {
         parsed.phase = "home";
       }
+      // Strip leader data from Colosseum rounds (old states may have it)
+      if (parsed.mode === "colosseum") {
+        for (const round of parsed.rounds) {
+          delete round.availableLeaders;
+          delete round.leaderTier;
+        }
+      }
 
       return parsed;
     }
