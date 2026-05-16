@@ -3,9 +3,9 @@
 
 import type { StandingsSnapshot } from "./gistService";
 
-// JSONBin.io API key from environment variable (free tier: 10k requests/month)
-// Set VITE_JSONBIN_API_KEY in your build environment
-const JSONBIN_API_KEY = import.meta.env.VITE_JSONBIN_API_KEY || "";
+// JSONBin.io API key — falls back to embedded key for public GitHub Pages deploy
+// Override via VITE_JSONBIN_API_KEY env var if needed (free tier: 10k requests/month)
+const JSONBIN_API_KEY = import.meta.env.VITE_JSONBIN_API_KEY || "$2a$10$Q2RszqHKGFY4huebTt1f2uqzvQnGfG0fT1q5nuZ2VyOkBpFAPFA4q";
 
 /**
  * Creates a new JSONBin with standings data.
