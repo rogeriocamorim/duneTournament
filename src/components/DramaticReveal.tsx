@@ -23,7 +23,7 @@ export function DramaticReveal({
   items,
   labels,
   enabled,
-  gridClass = "grid grid-cols-1 md:grid-cols-2 gap-4",
+  gridClass = "grid grid-cols-1 lg:grid-cols-2 gap-4",
   onAllRevealed,
 }: DramaticRevealProps) {
   const [revealedCount, setRevealedCount] = useState(0);

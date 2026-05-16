@@ -9,7 +9,9 @@ import { LeaderReveal } from "../components/animations/LeaderReveal";
 import type { TournamentState, TableResult } from "../engine/types";
 import { getTop8, getFinalStandings } from "../engine/tournament";
 import { generateRandomTableResults } from "../engine/testUtils";
-import { Trophy, Crown, Swords, ChevronRight, BarChart3, FlaskConical, History } from "lucide-react";
+import { GroupStandings } from "../components/GroupStandings";
+import { SeatPickStatsPanel } from "../components/SeatPickStatsPanel";
+import { Trophy, Crown, Swords, ChevronRight, BarChart3, FlaskConical, History, BarChart } from "lucide-react";
 
 // ===== Classic mode table labels =====
 const ELITE_TABLE_LABELS = ["Elite Table A", "Elite Table B"];
@@ -40,7 +42,7 @@ export function Top8Page({
   dramaticReveal,
   testMode,
 }: Top8PageProps) {
-  const [activePanel, setActivePanel] = useState<"standings" | "leaders" | "history" | null>(null);
+  const [activePanel, setActivePanel] = useState<"standings" | "leaders" | "draftstats" | "history" | null>(null);
   const [showLeaderReveal, setShowLeaderReveal] = useState(false);
   const [leaderRevealDone, setLeaderRevealDone] = useState(false);
   const lastRevealedRound = useRef<number>(0);
@@ -72,9 +74,10 @@ export function Top8Page({
     currentRound?.isComplete &&
     (currentRound.type === "semifinal" || currentRound.type === "winners-final");
 
-  // Auto-show leader reveal when a new incomplete elimination round with leaders appears
+  // Auto-show leader reveal when a new incomplete elimination round with leaders appears (Classic only)
   useEffect(() => {
     if (
+      !isColosseum &&
       dramaticReveal &&
       lastElimRound &&
       !lastElimRound.isComplete &&
@@ -85,7 +88,7 @@ export function Top8Page({
       setShowLeaderReveal(true);
       setLeaderRevealDone(false);
     }
-  }, [dramaticReveal, lastElimRound]);
+  }, [dramaticReveal, lastElimRound, isColosseum]);
 
   const handleStartTop8 = useCallback(() => {
     onStartTop8();
@@ -129,7 +132,7 @@ export function Top8Page({
     : null;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -281,13 +284,16 @@ export function Top8Page({
             <>
               {isColosseum ? (
                 <>
-                  {/* Colosseum: Semifinals (tables 0-1) + Eliminators (tables 2-3) */}
+                  {/* Colosseum: Semifinals (tables 0-1) + Eliminators (tables 2-3) — A Tier */}
                   <h2 className="text-display text-sm text-center text-sand-dark mb-4">
                     Round {currentRound.number} &mdash; Semifinals
+                    <span className="ml-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest bg-spice/20 text-spice border border-spice/30 rounded-sm align-middle">
+                      Tier A
+                    </span>
                   </h2>
                   <DramaticReveal
                     roundKey={`colosseum-sf-r${currentRound.number}`}
-                    enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
+                    enabled={dramaticReveal && !currentRound.isComplete && (isColosseum || leaderRevealDone)}
                     labels={COLOSSEUM_SF_LABELS}
                     items={currentRound.tables.slice(0, 2).map((table, index) => (
                       <div key={`r${currentRound.number}-t${table.id}`}>
@@ -301,7 +307,8 @@ export function Top8Page({
                           onSubmitResults={onSubmitResults}
                           animationDelay={dramaticReveal ? 0 : index}
                           allowEdit
-                          availableLeaders={currentRound.availableLeaders}
+                          availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
+                          leaderTier={isColosseum ? undefined : currentRound.leaderTier}
                           mode={state.mode}
                         />
                       </div>
@@ -310,10 +317,13 @@ export function Top8Page({
 
                   <h2 className="text-display text-sm text-center text-sand-dark mb-4 mt-6">
                     Round {currentRound.number} &mdash; Eliminators
+                    <span className="ml-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest bg-spice/20 text-spice border border-spice/30 rounded-sm align-middle">
+                      Tier A
+                    </span>
                   </h2>
                   <DramaticReveal
                     roundKey={`colosseum-elim-r${currentRound.number}`}
-                    enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
+                    enabled={dramaticReveal && !currentRound.isComplete && (isColosseum || leaderRevealDone)}
                     labels={COLOSSEUM_ELIM_LABELS}
                     items={currentRound.tables.slice(2, 4).map((table, index) => (
                       <div key={`r${currentRound.number}-t${table.id}`}>
@@ -327,7 +337,8 @@ export function Top8Page({
                           onSubmitResults={onSubmitResults}
                           animationDelay={dramaticReveal ? 0 : index + 2}
                           allowEdit
-                          availableLeaders={currentRound.availableLeaders}
+                          availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
+                          leaderTier={isColosseum ? undefined : currentRound.leaderTier}
                           mode={state.mode}
                         />
                       </div>
@@ -342,7 +353,7 @@ export function Top8Page({
                   </h2>
                   <DramaticReveal
                     roundKey={`elite-r${currentRound.number}`}
-                    enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
+                    enabled={dramaticReveal && !currentRound.isComplete && (isColosseum || leaderRevealDone)}
                     labels={ELITE_TABLE_LABELS}
                     items={currentRound.tables.slice(0, 2).map((table, index) => (
                       <div key={`r${currentRound.number}-t${table.id}`}>
@@ -356,7 +367,8 @@ export function Top8Page({
                           onSubmitResults={onSubmitResults}
                           animationDelay={dramaticReveal ? 0 : index}
                           allowEdit
-                          availableLeaders={currentRound.availableLeaders}
+                          availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
+                          leaderTier={isColosseum ? undefined : currentRound.leaderTier}
                           mode={state.mode}
                         />
                       </div>
@@ -368,7 +380,7 @@ export function Top8Page({
                   </h2>
                   <DramaticReveal
                     roundKey={`challenger-r${currentRound.number}`}
-                    enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
+                    enabled={dramaticReveal && !currentRound.isComplete && (isColosseum || leaderRevealDone)}
                     labels={CHALLENGER_TABLE_LABELS}
                     items={currentRound.tables.slice(2, 4).map((table, index) => (
                       <div key={`r${currentRound.number}-t${table.id}`}>
@@ -382,7 +394,8 @@ export function Top8Page({
                           onSubmitResults={onSubmitResults}
                           animationDelay={dramaticReveal ? 0 : index + 2}
                           allowEdit
-                          availableLeaders={currentRound.availableLeaders}
+                          availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
+                          leaderTier={isColosseum ? undefined : currentRound.leaderTier}
                           mode={state.mode}
                         />
                       </div>
@@ -398,13 +411,16 @@ export function Top8Page({
             <>
               {isColosseum ? (
                 <>
-                  {/* Colosseum SF2: 2 competitive tables (no bye) */}
+                  {/* Colosseum SF2: 2 competitive tables (no bye) — B Tier */}
                   <h2 className="text-display text-sm text-center text-sand-dark mb-4">
                     Round {currentRound.number} &mdash; Semifinal 2
+                    <span className="ml-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest bg-fremen-blue/20 text-fremen-blue border border-fremen-blue/30 rounded-sm align-middle">
+                      Tier B
+                    </span>
                   </h2>
                   <DramaticReveal
                     roundKey={`colosseum-sf2-r${currentRound.number}`}
-                    enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
+                    enabled={dramaticReveal && !currentRound.isComplete && (isColosseum || leaderRevealDone)}
                     labels={COLOSSEUM_SF2_LABELS}
                     items={currentRound.tables.map((table, index) => (
                       <div key={`r${currentRound.number}-t${table.id}`}>
@@ -418,7 +434,8 @@ export function Top8Page({
                           onSubmitResults={onSubmitResults}
                           animationDelay={dramaticReveal ? 0 : index}
                           allowEdit
-                          availableLeaders={currentRound.availableLeaders}
+                          availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
+                          leaderTier={isColosseum ? undefined : currentRound.leaderTier}
                           mode={state.mode}
                         />
                       </div>
@@ -453,7 +470,7 @@ export function Top8Page({
                   {/* Lower Finals */}
                   <DramaticReveal
                     roundKey={`redemption-r${currentRound.number}`}
-                    enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
+                    enabled={dramaticReveal && !currentRound.isComplete && (isColosseum || leaderRevealDone)}
                     labels={LOWER_FINAL_LABELS}
                     items={currentRound.tables.slice(1).map((table, index) => (
                       <div key={`r${currentRound.number}-t${table.id}`}>
@@ -467,7 +484,8 @@ export function Top8Page({
                           onSubmitResults={onSubmitResults}
                           animationDelay={dramaticReveal ? 0 : index}
                           allowEdit
-                          availableLeaders={currentRound.availableLeaders}
+                          availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
+                          leaderTier={isColosseum ? undefined : currentRound.leaderTier}
                           mode={state.mode}
                         />
                       </div>
@@ -483,14 +501,19 @@ export function Top8Page({
             <>
               <h2 className="text-display text-sm text-center text-sand-dark mb-4">
                 Round {currentRound.number} &mdash; Grand Final
+                {isColosseum && (
+                  <span className="ml-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest bg-blood/20 text-blood border border-blood/30 rounded-sm align-middle">
+                    Tier C
+                  </span>
+                )}
               </h2>
               <DramaticReveal
                 roundKey={`grand-final-r${currentRound.number}`}
-                enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
+                enabled={dramaticReveal && !currentRound.isComplete && (isColosseum || leaderRevealDone)}
                 labels={["Grand Final"]}
                 gridClass="flex justify-center"
                 items={currentRound.tables.map((table, index) => (
-                  <div key={`r${currentRound.number}-t${table.id}`} className="w-full max-w-xl">
+                  <div key={`r${currentRound.number}-t${table.id}`} className="w-full max-w-3xl">
                     <TableCard
                       table={table}
                       players={state.players}
@@ -498,7 +521,8 @@ export function Top8Page({
                       onSubmitResults={onSubmitResults}
                       animationDelay={dramaticReveal ? 0 : index}
                       allowEdit
-                      availableLeaders={currentRound.availableLeaders}
+                      availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
+                      leaderTier={isColosseum ? undefined : currentRound.leaderTier}
                       mode={state.mode}
                     />
                   </div>
@@ -520,17 +544,31 @@ export function Top8Page({
               }`}
             >
               <BarChart3 size={14} />
-              {activePanel === "standings" ? "Hide" : "Show"} Standings
+              {activePanel === "standings" ? "Hide" : "Show"}{" "}
+              {state.mode === "colosseum" ? "Group Standings" : "Standings"}
             </button>
-            <button
-              onClick={() => setActivePanel(activePanel === "leaders" ? null : "leaders")}
-              className={`flex items-center gap-2 text-sm uppercase tracking-widest ${
-                activePanel === "leaders" ? "text-spice" : "text-sand-dark hover:text-sand"
-              }`}
-            >
-              <Crown size={14} />
-              {activePanel === "leaders" ? "Hide" : "Show"} Leaders
-            </button>
+            {!isColosseum && (
+              <button
+                onClick={() => setActivePanel(activePanel === "leaders" ? null : "leaders")}
+                className={`flex items-center gap-2 text-sm uppercase tracking-widest ${
+                  activePanel === "leaders" ? "text-spice" : "text-sand-dark hover:text-sand"
+                }`}
+              >
+                <Crown size={14} />
+                {activePanel === "leaders" ? "Hide" : "Show"} Leaders
+              </button>
+            )}
+            {isColosseum && (
+              <button
+                onClick={() => setActivePanel(activePanel === "draftstats" ? null : "draftstats")}
+                className={`flex items-center gap-2 text-sm uppercase tracking-widest ${
+                  activePanel === "draftstats" ? "text-spice" : "text-sand-dark hover:text-sand"
+                }`}
+              >
+                <BarChart size={14} />
+                {activePanel === "draftstats" ? "Hide" : "Show"} Draft Stats
+              </button>
+            )}
             <button
               onClick={() => setActivePanel(activePanel === "history" ? null : "history")}
               className={`flex items-center gap-2 text-sm uppercase tracking-widest ${
@@ -546,16 +584,32 @@ export function Top8Page({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
             >
-              <Leaderboard players={state.players} highlightTop={16} finalStandings={finalStandings} rounds={state.rounds} />
+              {state.mode === "colosseum" ? (
+                <GroupStandings
+                  players={state.players}
+                  rounds={state.rounds.filter((r) => r.type === "qualifying")}
+                />
+              ) : (
+                <Leaderboard players={state.players} highlightTop={16} finalStandings={finalStandings} rounds={state.rounds} />
+              )}
             </motion.div>
           )}
-          {activePanel === "leaders" && (
+          {activePanel === "leaders" && !isColosseum && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               className="mt-4"
             >
               <LeaderStatsPanel rounds={state.rounds} />
+            </motion.div>
+          )}
+          {activePanel === "draftstats" && isColosseum && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="mt-4"
+            >
+              <SeatPickStatsPanel rounds={state.rounds} />
             </motion.div>
           )}
           {activePanel === "history" && (
@@ -570,9 +624,9 @@ export function Top8Page({
         </div>
       )}
 
-      {/* Leader Tier Reveal Overlay */}
+      {/* Leader Tier Reveal Overlay (Classic only) */}
       <AnimatePresence>
-        {showLeaderReveal && currentRound?.availableLeaders && (
+        {!isColosseum && showLeaderReveal && currentRound?.availableLeaders && (
           <LeaderReveal
             leaders={currentRound.availableLeaders}
             tier="C"

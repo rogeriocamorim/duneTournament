@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "motion/react";
 import { useState, useEffect } from "react";
-import type { Table, TableResult, Player, TournamentMode } from "../engine/types";
-import { LEADER_LIST } from "../engine/types";
+import type { Table, TableResult, Player, TournamentMode, LeaderTier } from "../engine/types";
+import { LEADER_LIST, getLeadersByTier } from "../engine/types";
 import { Pencil, AlertTriangle } from "lucide-react";
 
 interface TableCardProps {
@@ -12,6 +12,7 @@ interface TableCardProps {
   animationDelay?: number;
   allowEdit?: boolean;
   availableLeaders?: string[];
+  leaderTier?: LeaderTier;
   mode?: TournamentMode;
 }
 
@@ -55,9 +56,16 @@ export function TableCard({
   animationDelay = 0,
   allowEdit = false,
   availableLeaders,
+  leaderTier,
   mode = "classic",
 }: TableCardProps) {
   const isColosseum = mode === "colosseum";
+
+  // In Colosseum mode, show all leaders from the round's tier (online game picks randomly)
+  // In Classic mode, use the specific availableLeaders subset
+  const leaderOptions: string[] | undefined = isColosseum && leaderTier
+    ? getLeadersByTier(leaderTier).map((l) => l.name)
+    : availableLeaders;
   const [editing, setEditing] = useState(!table.isComplete);
   const [results, setResults] = useState<Record<string, LocalResult>>(
     () => {
@@ -184,17 +192,19 @@ export function TableCard({
       }
     }
 
-    // Validate: no duplicate leaders at the same table
-    const leaders = entries.map(([, r]) => r.leader).filter(Boolean);
-    const uniqueLeaders = new Set(leaders);
-    if (uniqueLeaders.size !== leaders.length) {
-      const seen = new Set<string>();
-      for (const [, r] of entries) {
-        if (r.leader && seen.has(r.leader)) {
-          setError(`Duplicate leader: ${r.leader} is selected by multiple players at this table.`);
-          return;
+    // Validate: no duplicate leaders at the same table (Classic only)
+    if (!isColosseum) {
+      const leaders = entries.map(([, r]) => r.leader).filter(Boolean);
+      const uniqueLeaders = new Set(leaders);
+      if (uniqueLeaders.size !== leaders.length) {
+        const seen = new Set<string>();
+        for (const [, r] of entries) {
+          if (r.leader && seen.has(r.leader)) {
+            setError(`Duplicate leader: ${r.leader} is selected by multiple players at this table.`);
+            return;
+          }
+          if (r.leader) seen.add(r.leader);
         }
-        if (r.leader) seen.add(r.leader);
       }
     }
 
@@ -275,7 +285,7 @@ export function TableCard({
           return (
             <div
               key={player.id}
-              className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0"
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 border-b border-white/5 last:border-0"
             >
               {/* Position selector */}
               {editing ? (
@@ -308,7 +318,7 @@ export function TableCard({
               )}
 
               {/* Player name */}
-              <span className="flex-1 text-display text-sm truncate min-w-0">
+              <span className="flex-1 text-display text-sm min-w-[8rem]">
                 {player.name}
               </span>
 
@@ -358,19 +368,19 @@ export function TableCard({
                 </span>
               ) : null}
 
-              {/* Leader selector */}
-              {editing ? (
+              {/* Leader selector (Classic only — Colosseum is online, no leader selection) */}
+              {!isColosseum && editing ? (
                 <select
                   value={result?.leader || ""}
                   onChange={(e) =>
                     handleLeaderChange(player.id, e.target.value)
                   }
-                  className="bg-black/50 border border-spice/30 text-sand text-xs px-1 py-1 rounded-sm w-28 truncate"
+                  className="bg-black/50 border border-spice/30 text-sand text-xs px-1 py-1 rounded-sm w-36 truncate"
                 >
                   <option value="">Leader...</option>
-                  {availableLeaders ? (
-                    // Filtered: only show the 7 leaders available for this round
-                    availableLeaders.map((name) => {
+                  {leaderOptions ? (
+                    // Show leaders from available pool (or full tier in Colosseum)
+                    leaderOptions.map((name) => {
                       const info = LEADER_LIST.find((l) => l.name === name);
                       return (
                         <option key={info?.id ?? name} value={name}>
@@ -396,8 +406,8 @@ export function TableCard({
                   )}
                 </select>
               ) : (
-                result?.leader && (
-                  <span className="text-xs text-sand-dark opacity-70 w-28 truncate text-center" title={result.leader}>
+                !isColosseum && result?.leader && (
+                  <span className="text-xs text-sand-dark opacity-70 w-36 truncate text-center" title={result.leader}>
                     {result.leader}
                   </span>
                 )

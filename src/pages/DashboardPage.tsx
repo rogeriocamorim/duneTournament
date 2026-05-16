@@ -76,9 +76,10 @@ export function DashboardPage({
     }
   }, [isColosseum, displayRoundIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-show leader reveal when a new incomplete round with leaders appears
+  // Auto-show leader reveal when a new incomplete round with leaders appears (Classic only)
   useEffect(() => {
     if (
+      !isColosseum &&
       dramaticReveal &&
       currentRound &&
       !currentRound.isComplete &&
@@ -90,7 +91,7 @@ export function DashboardPage({
       setLeaderRevealDone(false);
       setTablesRevealed(false);
     }
-  }, [dramaticReveal, currentRound]);
+  }, [dramaticReveal, currentRound, isColosseum]);
 
   const handleAutoFillResults = useCallback(() => {
     if (!currentRound) return;
@@ -212,17 +213,19 @@ export function DashboardPage({
           <BarChart3 size={16} />
           Standings
         </button>
-        <button
-          onClick={() => setActiveTab("leaders")}
-          className={`flex items-center gap-2 px-4 py-2 text-sm uppercase tracking-widest transition-all ${
-            activeTab === "leaders"
-              ? "text-spice border-b-2 border-spice"
-              : "text-sand-dark hover:text-sand"
-          }`}
-        >
-          <Crown size={16} />
-          Leaders
-        </button>
+        {!isColosseum && (
+          <button
+            onClick={() => setActiveTab("leaders")}
+            className={`flex items-center gap-2 px-4 py-2 text-sm uppercase tracking-widest transition-all ${
+              activeTab === "leaders"
+                ? "text-spice border-b-2 border-spice"
+                : "text-sand-dark hover:text-sand"
+            }`}
+          >
+            <Crown size={16} />
+            Leaders
+          </button>
+        )}
         {isColosseum && (
           <button
             onClick={() => setActiveTab("seats")}
@@ -251,8 +254,8 @@ export function DashboardPage({
         )}
       </div>
 
-      {/* Round Leaders button */}
-      {currentRound?.availableLeaders && (
+      {/* Round Leaders button (Classic only) */}
+      {!isColosseum && currentRound?.availableLeaders && (
         <div className="flex justify-center mb-6">
           <button
             onClick={() => {
@@ -377,7 +380,7 @@ export function DashboardPage({
               )}
               <DramaticReveal
                 roundKey={`qualifying-r${currentRound.number}`}
-                enabled={dramaticReveal && !currentRound.isComplete && leaderRevealDone}
+                enabled={dramaticReveal && !currentRound.isComplete && (isColosseum || leaderRevealDone)}
                 labels={currentRound.tables.map((t) => `Table #${t.id}`)}
                 onAllRevealed={() => setTablesRevealed(true)}
                 gridClass={isColosseum ? "grid grid-cols-1 gap-4 max-w-2xl mx-auto" : "grid grid-cols-1 md:grid-cols-2 gap-4"}
@@ -390,14 +393,15 @@ export function DashboardPage({
                     onSubmitResults={onSubmitResults}
                     animationDelay={dramaticReveal ? 0 : index}
                     allowEdit
-                    availableLeaders={currentRound.availableLeaders}
+                    availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
+                    leaderTier={isColosseum ? undefined : currentRound.leaderTier}
                     mode={state.mode}
                   />
                 ))}
               />
 
-              {/* Available Leaders for this round */}
-              {currentRound.availableLeaders && tablesRevealed && (
+              {/* Available Leaders for this round (Classic only) */}
+              {!isColosseum && currentRound.availableLeaders && tablesRevealed && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -482,7 +486,7 @@ export function DashboardPage({
         </motion.div>
       )}
 
-      {activeTab === "leaders" && (
+      {activeTab === "leaders" && !isColosseum && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -509,9 +513,9 @@ export function DashboardPage({
         </motion.div>
       )}
 
-      {/* Leader Tier Reveal Overlay */}
+      {/* Leader Tier Reveal Overlay (Classic only) */}
       <AnimatePresence>
-        {showLeaderReveal && currentRound?.availableLeaders && (
+        {!isColosseum && showLeaderReveal && currentRound?.availableLeaders && (
           <LeaderReveal
             leaders={currentRound.availableLeaders}
             tier={currentRound.leaderTier ?? "A"}
