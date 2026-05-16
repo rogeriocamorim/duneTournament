@@ -3,7 +3,64 @@ import type { Page } from "@playwright/test";
 
 // ===== HELPERS =====
 
-/** Clear localStorage before each test to start fresh */
+/** Navigate Colosseum from registration through spinner wheel to qualifying dashboard */
+async function goToColosseumDashboard(page: Page, playerCount = 16) {
+  await resetState(page);
+  await waitForModeSelector(page);
+  await selectMode(page, "Colosseum");
+  await expect(page.getByText("The Summoning")).toBeVisible({ timeout: 5_000 });
+  await autoFillPlayers(page, playerCount);
+  // Ensure test mode is on (autoFillPlayers enables it)
+  await page.getByRole("button", { name: "Begin the Jihad" }).click();
+  // Wait for spinner wheel page
+  await expect(page.getByText(/group|spin|draw|wheel/i).first()).toBeVisible({ timeout: 10_000 });
+  // Auto-fill group assignments
+  await page.getByRole("button", { name: "Auto-Fill Remaining" }).click();
+  // Proceed to qualifying
+  await page.getByRole("button", { name: "Enter the Colosseum" }).click();
+  // Wait for dashboard
+  await expect(page.getByText("Round 1 / 4")).toBeVisible({ timeout: 10_000 });
+}
+
+/** Complete all 4 Colosseum qualifying rounds */
+async function completeColosseumQualifying(page: Page) {
+  for (let round = 1; round <= 4; round++) {
+    // Make sure we're on the right round tab
+    if (round > 1) {
+      await page.getByRole("button", { name: `R${round}` }).click();
+      await expect(page.getByText(`Round ${round} / 4`)).toBeVisible({ timeout: 5_000 });
+    }
+    // Auto-fill results for all tables in this round
+    const autoFill = page.getByRole("button", { name: "Auto Fill All Tables" });
+    await expect(autoFill).toBeVisible({ timeout: 5_000 });
+    await autoFill.click();
+    if (round < 4) {
+      // Wait for round completion badge
+      await expect(page.getByText(`Round ${round} Complete`)).toBeVisible({ timeout: 10_000 });
+    }
+  }
+  // After round 4, qualifying should be complete
+  await expect(page.getByText("Qualifying Complete")).toBeVisible({ timeout: 10_000 });
+}
+
+/** Navigate Colosseum through knockout draw to Top8 page (requires 64 players for 8 groups) */
+async function goToColosseumKnockout(page: Page) {
+  await goToColosseumDashboard(page, 64);
+  await ensureTestMode(page);
+  await completeColosseumQualifying(page);
+  // Begin knockout draw
+  await page.getByRole("button", { name: "Begin Knockout Draw" }).click();
+  await page.waitForTimeout(1500); // sandstorm transition
+  // KnockoutRandomizer: draw then confirm
+  await expect(page.getByRole("button", { name: "Draw the Bracket" })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Draw the Bracket" }).click();
+  await expect(page.getByRole("button", { name: /Confirm Draw/ })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: /Confirm Draw/ }).click();
+  // Wait for knockout stage
+  await expect(page.getByText("Knockout Stage")).toBeVisible({ timeout: 10_000 });
+  // Ensure test mode is still on after page transition
+  await ensureTestMode(page);
+}
 async function resetState(page: Page) {
   await page.goto("/");
   await page.evaluate(() => localStorage.clear());
@@ -36,9 +93,17 @@ async function addPlayers(page: Page, count: number, prefix = "Player") {
   }
 }
 
-/** Enable test mode via the toolbar flask icon */
+/** Toggle test mode via the toolbar flask icon */
 async function enableTestMode(page: Page) {
   await page.locator("button[title*='Test Mode']").click();
+}
+
+/** Ensure test mode is ON (idempotent — won't toggle OFF if already ON) */
+async function ensureTestMode(page: Page) {
+  const offBtn = page.locator("button[title='Test Mode: OFF']");
+  if (await offBtn.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    await offBtn.click();
+  }
 }
 
 /** Disable dramatic reveal to prevent overlays blocking interactions */
@@ -453,5 +518,180 @@ test.describe("Toolbar Controls", () => {
     await expect(shareBtn).toBeVisible();
     // Should be visually disabled
     await expect(shareBtn).toBeDisabled();
+  });
+});
+
+// ===== COLOSSEUM MODE — NO LEADER UI =====
+
+test.describe("Colosseum Mode — No Leader UI", () => {
+  test("qualifying dashboard does NOT show Leaders tab", async ({ page }) => {
+    await goToColosseumDashboard(page);
+    // Tables and Standings tabs should be visible
+    await expect(page.getByRole("button", { name: "Tables", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Standings", exact: true })).toBeVisible();
+    // Leaders tab should NOT be visible
+    await expect(page.getByRole("button", { name: "Leaders", exact: true })).not.toBeVisible();
+  });
+
+  test("qualifying dashboard does NOT show leader dropdown in table cards", async ({ page }) => {
+    await goToColosseumDashboard(page);
+    // No "Leader..." dropdown should be present
+    await expect(page.locator("select option:text('Leader...')")).toHaveCount(0);
+  });
+
+  test("qualifying dashboard does NOT show round leaders button", async ({ page }) => {
+    await goToColosseumDashboard(page);
+    // No "Round N Leaders" button
+    await expect(page.getByRole("button", { name: /Round \d+ Leaders/ })).not.toBeVisible();
+  });
+
+  test("qualifying dashboard shows Seats tab (draft stats)", async ({ page }) => {
+    await goToColosseumDashboard(page);
+    await expect(page.getByRole("button", { name: "Seats", exact: true })).toBeVisible();
+  });
+
+  test("knockout stage does NOT show leader dropdown in table cards", async ({ page }) => {
+    await goToColosseumKnockout(page);
+    // No leader dropdown
+    await expect(page.locator("select option:text('Leader...')")).toHaveCount(0);
+  });
+
+  test("knockout stage does NOT show Show Leaders button", async ({ page }) => {
+    await goToColosseumKnockout(page);
+    await expect(page.getByRole("button", { name: /Show Leaders/ })).not.toBeVisible();
+  });
+
+  test("knockout stage shows Show Draft Stats button", async ({ page }) => {
+    await goToColosseumKnockout(page);
+    await expect(page.getByRole("button", { name: /Draft Stats/ })).toBeVisible();
+  });
+
+  test("knockout stage shows Show Group Standings button", async ({ page }) => {
+    await goToColosseumKnockout(page);
+    await expect(page.getByRole("button", { name: /Group Standings/ })).toBeVisible();
+  });
+});
+
+// ===== COLOSSEUM MODE — TIER LABELS =====
+
+test.describe("Colosseum Mode — Tier Labels", () => {
+  test("SF1 round shows Tier A labels", async ({ page }) => {
+    await goToColosseumKnockout(page);
+    // Semifinals section should have Tier A badge
+    const tierABadges = page.locator("span:text('Tier A')");
+    await expect(tierABadges.first()).toBeVisible();
+    // Should have 2 Tier A badges (Semifinals + Eliminators)
+    await expect(tierABadges).toHaveCount(2);
+  });
+
+  test("SF2 round shows Tier B label", async ({ page }) => {
+    await goToColosseumKnockout(page);
+    await ensureTestMode(page);
+    // Complete SF1 round
+    await page.getByRole("button", { name: "Auto Fill All Tables" }).click();
+    // Generate SF2
+    await page.getByRole("button", { name: /Generate Semifinal 2/ }).click();
+    await expect(page.getByRole("heading", { name: /Semifinal 2/ })).toBeVisible({ timeout: 5_000 });
+    // Tier B badge should be visible
+    await expect(page.locator("span:text('Tier B')")).toBeVisible();
+  });
+
+  test("Grand Final shows Tier C label", async ({ page }) => {
+    await goToColosseumKnockout(page);
+    await ensureTestMode(page);
+    // Complete SF1
+    await page.getByRole("button", { name: "Auto Fill All Tables" }).click();
+    // Generate SF2
+    await page.getByRole("button", { name: /Generate Semifinal 2/ }).click();
+    await expect(page.getByRole("heading", { name: /Semifinal 2/ })).toBeVisible({ timeout: 5_000 });
+    // Complete SF2
+    await page.getByRole("button", { name: "Auto Fill All Tables" }).click();
+    // Generate Grand Final
+    await page.getByRole("button", { name: /Generate Grand Final/ }).click();
+    await expect(page.getByRole("heading", { name: /Grand Final/ })).toBeVisible({ timeout: 5_000 });
+    // Tier C badge should be visible
+    await expect(page.locator("span:text('Tier C')")).toBeVisible();
+  });
+});
+
+// ===== COLOSSEUM MODE — GROUP STANDINGS & DRAFT STATS =====
+
+test.describe("Colosseum Mode — Standings & Stats Panels", () => {
+  test("Show Group Standings displays group standings table", async ({ page }) => {
+    await goToColosseumKnockout(page);
+    await page.getByRole("button", { name: /Group Standings/ }).click();
+    // Should show group headers (Group 1 or House names)
+    await expect(page.getByText(/Group [12]|House/i).first()).toBeVisible({ timeout: 5_000 });
+  });
+
+  test("Show Draft Stats displays seat/pick statistics", async ({ page }) => {
+    await goToColosseumKnockout(page);
+    await page.getByRole("button", { name: /Draft Stats/ }).click();
+    // SeatPickStatsPanel should show seat position header
+    await expect(page.getByText(/Seat Position/i)).toBeVisible({ timeout: 5_000 });
+  });
+
+  test("panels are mutually exclusive (clicking one hides the other)", async ({ page }) => {
+    await goToColosseumKnockout(page);
+    // Show Group Standings
+    await page.getByRole("button", { name: /Group Standings/ }).click();
+    await expect(page.getByText(/Group [12]|House/i).first()).toBeVisible({ timeout: 5_000 });
+    // Switch to Draft Stats
+    await page.getByRole("button", { name: /Draft Stats/ }).click();
+    await expect(page.getByText(/Seat Position/i)).toBeVisible({ timeout: 5_000 });
+    // Group standings should be hidden
+    // Switch to History
+    await page.getByRole("button", { name: /History/ }).click();
+    // Draft stats should be gone, history visible
+    await expect(page.getByText(/Seat Position/i)).not.toBeVisible({ timeout: 3_000 });
+  });
+});
+
+// ===== COLOSSEUM MODE — DRAMATIC REVEAL DEFAULT =====
+
+test.describe("Colosseum Mode — Dramatic Reveal Default", () => {
+  test("dramatic reveal is OFF by default in Colosseum", async ({ page }) => {
+    await resetState(page);
+    await waitForModeSelector(page);
+    await selectMode(page, "Colosseum");
+    await expect(page.getByText("The Summoning")).toBeVisible({ timeout: 5_000 });
+    // Dramatic reveal button should show OFF state
+    await expect(page.locator("button[title='Dramatic Reveal: OFF']")).toBeVisible();
+  });
+
+  test("dramatic reveal is ON by default in Classic", async ({ page }) => {
+    await resetState(page);
+    await waitForModeSelector(page);
+    await selectMode(page, "Classic");
+    await expect(page.getByText("The Summoning")).toBeVisible({ timeout: 5_000 });
+    // Dramatic reveal button should show ON state
+    await expect(page.locator("button[title='Dramatic Reveal: ON']")).toBeVisible();
+  });
+});
+
+// ===== COLOSSEUM MODE — FULL KNOCKOUT FLOW =====
+
+test.describe("Colosseum Mode — Full Knockout Flow", () => {
+  test("can complete all knockout rounds through to Grand Final", async ({ page }) => {
+    await goToColosseumKnockout(page);
+    await ensureTestMode(page);
+
+    // SF1 — auto-fill and advance
+    await page.getByRole("button", { name: "Auto Fill All Tables" }).click();
+    await page.getByRole("button", { name: /Generate Semifinal 2/ }).click();
+    await expect(page.getByRole("heading", { name: /Semifinal 2/ })).toBeVisible({ timeout: 5_000 });
+
+    // SF2 — auto-fill and advance
+    await page.getByRole("button", { name: "Auto Fill All Tables" }).click();
+    await page.getByRole("button", { name: /Generate Grand Final/ }).click();
+    await expect(page.getByRole("heading", { name: /Grand Final/ })).toBeVisible({ timeout: 5_000 });
+
+    // Grand Final — auto-fill and crown emperor
+    await page.getByRole("button", { name: "Auto Fill All Tables" }).click();
+    await page.getByRole("button", { name: /Crown the Emperor/ }).click();
+
+    // Should show winner
+    await expect(page.getByText("The Prophecy Fulfilled")).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText("Emperor of the Known Universe")).toBeVisible();
   });
 });

@@ -252,14 +252,11 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
             { id: 1, playerIds: pool.slice(0, 4), results: [] as TableResult[], isComplete: false },
             { id: 2, playerIds: pool.slice(4, 8), results: [] as TableResult[], isComplete: false },
           ];
-          const bLeaders = selectRoundLeaders("B");
           const newRound: Round = {
             number: state.rounds.length + 1,
             tables: sf2Tables,
             isComplete: false,
             type: "winners-final",
-            availableLeaders: bLeaders.map((l) => l.name),
-            leaderTier: "B",
           };
           return {
             ...state,
@@ -306,14 +303,11 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
             results: [] as TableResult[],
             isComplete: false,
           };
-          const cLeadersGF = selectRoundLeaders("C");
           const gfRound: Round = {
             number: state.rounds.length + 1,
             tables: [grandFinalTable],
             isComplete: false,
             type: "grand-final",
-            availableLeaders: cLeadersGF.map((l) => l.name),
-            leaderTier: "C",
           };
           return {
             ...state,
@@ -410,16 +404,11 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
         tempState = { ...tempState, currentRound: i };
         const tables = generateColosseumPairing(tempState);
         const roundNumber = i + 1;
-        const tierCycle: ("B" | "C" | "A")[] = ["B", "C", "A", "B"];
-        const tier = tierCycle[i];
-        const leaders = selectRoundLeaders(tier);
         rounds.push({
           number: roundNumber,
           tables,
           isComplete: false,
           type: "qualifying",
-          availableLeaders: leaders.map((l) => l.name),
-          leaderTier: tier,
         });
       }
 
@@ -441,16 +430,11 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
         tempState = { ...tempState, currentRound: i };
         const tables = generateColosseumPairing(tempState);
         const roundNumber = i + 1;
-        const tierCycle: ("B" | "C" | "A")[] = ["B", "C", "A", "B"];
-        const tier = tierCycle[i];
-        const leaders = selectRoundLeaders(tier);
         rounds.push({
           number: roundNumber,
           tables,
           isComplete: false,
           type: "qualifying",
-          availableLeaders: leaders.map((l) => l.name),
-          leaderTier: tier,
         });
       }
       return {
@@ -475,14 +459,11 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
         results: [],
         isComplete: false,
       }));
-      const aLeaders = selectRoundLeaders("A");
       const newRound: Round = {
         number: state.rounds.length + 1,
         tables: knockoutTables,
         isComplete: false,
         type: "semifinal",
-        availableLeaders: aLeaders.map((l) => l.name),
-        leaderTier: "A",
       };
       return {
         ...state,
