@@ -65,7 +65,7 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
         mode: action.mode,
         phase: "registration",
         metadata: { ...state.metadata, tournamentName, timestamp: new Date().toISOString() },
-        settings: { ...state.settings, totalQualifyingRounds },
+        settings: { ...state.settings, totalQualifyingRounds, dramaticReveal: action.mode !== "colosseum" },
       };
     }
 

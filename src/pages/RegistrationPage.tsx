@@ -30,10 +30,17 @@ export function RegistrationPage({
     ? players.length >= 16 && players.length % 8 === 0
     : players.length >= 4 && players.length % 4 === 0;
   const [showVideo, setShowVideo] = useState(false);
-  const [testPlayerCount, setTestPlayerCount] = useState(20);
+  const [testPlayerCountInput, setTestPlayerCountInput] = useState("20");
+
+  const clampPlayerCount = () => {
+    const n = Math.min(100, Math.max(4, parseInt(testPlayerCountInput) || 4));
+    setTestPlayerCountInput(String(n));
+  };
 
   const handleAutoFillPlayers = () => {
-    const names = generateTestPlayerNames(testPlayerCount);
+    const count = Math.min(100, Math.max(4, parseInt(testPlayerCountInput) || 4));
+    setTestPlayerCountInput(String(count));
+    const names = generateTestPlayerNames(count);
     for (const name of names) {
       onAddPlayer(name);
     }
@@ -131,8 +138,9 @@ export function RegistrationPage({
             type="number"
             min={4}
             max={100}
-            value={testPlayerCount}
-            onChange={(e) => setTestPlayerCount(Math.max(4, parseInt(e.target.value) || 4))}
+            value={testPlayerCountInput}
+            onChange={(e) => setTestPlayerCountInput(e.target.value)}
+            onBlur={clampPlayerCount}
             className="bg-black/50 border border-fremen-blue/40 text-score text-sm px-2 py-1 rounded-sm w-16 text-center text-white"
           />
           <button
