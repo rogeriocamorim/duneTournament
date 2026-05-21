@@ -39,6 +39,8 @@ function App() {
     selectMode,
     addPlayer,
     removePlayer,
+    renamePlayer,
+    dropPlayer,
     startTournament,
     generateRound,
     submitTableResults,
@@ -268,6 +270,9 @@ function App() {
               onSubmitResults={submitTableResults}
               onBatchSubmitResults={batchSubmitTableResults}
               onStartTop8={handleStartTop8}
+              onRenamePlayer={renamePlayer}
+              onDropPlayer={dropPlayer}
+              onAddPlayer={addPlayer}
               dramaticReveal={state.settings.dramaticReveal}
               testMode={state.settings.testMode}
             />

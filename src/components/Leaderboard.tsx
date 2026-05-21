@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import { ChevronUp, ChevronDown, Minus } from "lucide-react";
 import type { Player, Round } from "../engine/types";
-import { getStandings, getVpSharePct, getStandingsAsOfRound } from "../engine/tournament";
+import { getStandings, getVpSharePct, getStandingsAsOfRound, getTierForRound } from "../engine/tournament";
 
 interface LeaderboardProps {
   players: Player[];
@@ -59,19 +59,31 @@ export function Leaderboard({ players, highlightTop = 0, finalStandings, rounds 
           </button>
           {completedRounds
             .sort((a, b) => a.number - b.number)
-            .map((r) => (
-              <button
-                key={r.number}
-                onClick={() => setSelectedRound(r.number)}
-                className={`px-3 py-1 text-xs uppercase tracking-widest rounded-sm transition-all ${
-                  selectedRound === r.number
-                    ? "bg-spice/20 text-spice border border-spice/40"
-                    : "glass-morphism text-sand hover:text-spice border border-sand-dark/40 hover:border-spice/40"
-                }`}
-              >
-                R{r.number}
-              </button>
-            ))}
+            .map((r) => {
+              const tier = r.leaderTier ?? getTierForRound(r.number, false);
+              const tierColors: Record<string, string> = { A: "#ef4444", B: "#c5a059", C: "#38bdf8" };
+              const tierColor = tierColors[tier] ?? "#c5a059";
+              return (
+                <div key={r.number} className="flex flex-col items-center gap-0.5">
+                  <span
+                    className="text-[9px] font-bold uppercase leading-none"
+                    style={{ color: tierColor }}
+                  >
+                    {tier}
+                  </span>
+                  <button
+                    onClick={() => setSelectedRound(r.number)}
+                    className={`px-3 py-1 text-xs uppercase tracking-widest rounded-sm transition-all ${
+                      selectedRound === r.number
+                        ? "bg-spice/20 text-spice border border-spice/40"
+                        : "glass-morphism text-sand hover:text-spice border border-sand-dark/40 hover:border-spice/40"
+                    }`}
+                  >
+                    R{r.number}
+                  </button>
+                </div>
+              );
+            })}
         </div>
       )}
 

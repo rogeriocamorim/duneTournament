@@ -33,6 +33,8 @@ type Action =
   | { type: "SELECT_MODE"; mode: TournamentMode }
   | { type: "ADD_PLAYER"; name: string }
   | { type: "REMOVE_PLAYER"; id: string }
+  | { type: "RENAME_PLAYER"; id: string; name: string }
+  | { type: "DROP_PLAYER"; id: string }
   | { type: "SET_TOURNAMENT_NAME"; name: string }
   | { type: "START_TOURNAMENT" }
   | { type: "GENERATE_ROUND" }
@@ -82,6 +84,27 @@ function tournamentReducer(state: TournamentState, action: Action): TournamentSt
       return {
         ...state,
         players: state.players.filter((p) => p.id !== action.id),
+      };
+    }
+
+    case "RENAME_PLAYER": {
+      const trimmed = action.name.trim();
+      if (!trimmed) return state;
+      return {
+        ...state,
+        players: state.players.map((p) =>
+          p.id === action.id ? { ...p, name: trimmed } : p
+        ),
+        metadata: { ...state.metadata, timestamp: new Date().toISOString() },
+      };
+    }
+
+    case "DROP_PLAYER": {
+      // Remove player from active roster; past round results are preserved
+      return {
+        ...state,
+        players: state.players.filter((p) => p.id !== action.id),
+        metadata: { ...state.metadata, timestamp: new Date().toISOString() },
       };
     }
 
@@ -510,11 +533,11 @@ function loadState(): TournamentState {
       if (parsed.phase === "registration" && parsed.players.length === 0 && !parsed.mode) {
         parsed.phase = "home";
       }
-      // Strip leader data from Colosseum rounds (old states may have it)
+      // Strip leader selection data from Colosseum rounds (old states may have it)
+      // Keep leaderTier for display purposes (tier badge on round buttons)
       if (parsed.mode === "colosseum") {
         for (const round of parsed.rounds) {
           delete round.availableLeaders;
-          delete round.leaderTier;
         }
       }
 
@@ -546,6 +569,14 @@ export function useTournamentState() {
 
   const removePlayer = useCallback((id: string) => {
     dispatch({ type: "REMOVE_PLAYER", id });
+  }, []);
+
+  const renamePlayer = useCallback((id: string, name: string) => {
+    dispatch({ type: "RENAME_PLAYER", id, name });
+  }, []);
+
+  const dropPlayer = useCallback((id: string) => {
+    dispatch({ type: "DROP_PLAYER", id });
   }, []);
 
   const setTournamentName = useCallback((name: string) => {
@@ -659,30 +690,29 @@ export function useTournamentState() {
       })),
     };
 
-    // If first time sharing, create new JSONBin
-    if (!state.metadata.jsonbinId) {
-      const binId = await createStandingsBin(
-        snapshot,
-        state.metadata.tournamentName
-      );
-      
-      // Store JSONBin ID in state
-      dispatch({ type: "SET_JSONBIN_INFO", binId, binKey: "" });
-      
-      // Return shareable URL
-      const baseUrl = window.location.origin + window.location.pathname;
-      return `${baseUrl}?view=${binId}`;
+    const baseUrl = window.location.origin + window.location.pathname;
+
+    // If we have an existing bin, try to update it first
+    if (state.metadata.jsonbinId) {
+      try {
+        await updateStandingsBin(state.metadata.jsonbinId, snapshot);
+        return `${baseUrl}?view=${state.metadata.jsonbinId}`;
+      } catch {
+        // Bin might be stale/expired — fall through to create a new one
+        console.warn("Failed to update existing bin, creating a new one...");
+      }
     }
 
-    // Update existing JSONBin with new standings
-    await updateStandingsBin(
-      state.metadata.jsonbinId,
-      snapshot
+    // Create new JSONBin
+    const binId = await createStandingsBin(
+      snapshot,
+      state.metadata.tournamentName
     );
 
-    // Return same shareable URL
-    const baseUrl = window.location.origin + window.location.pathname;
-    return `${baseUrl}?view=${state.metadata.jsonbinId}`;
+    // Store JSONBin ID in state
+    dispatch({ type: "SET_JSONBIN_INFO", binId, binKey: "" });
+
+    return `${baseUrl}?view=${binId}`;
   }, [state, dispatch]);
 
   return {
@@ -691,6 +721,8 @@ export function useTournamentState() {
     selectMode,
     addPlayer,
     removePlayer,
+    renamePlayer,
+    dropPlayer,
     setTournamentName,
     startTournament,
     generateRound,

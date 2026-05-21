@@ -8,11 +8,13 @@ import { GroupStandings } from "../components/GroupStandings";
 import { SeatPickStatsPanel } from "../components/SeatPickStatsPanel";
 import { RoundHistory } from "../components/RoundHistory";
 import { LeaderReveal } from "../components/animations/LeaderReveal";
+import { PlayerManager } from "../components/PlayerManager";
 import type { TournamentState, TableResult } from "../engine/types";
 import { getLeaderInfo, getLeaderImageUrl } from "../engine/types";
 import { generateRandomTableResults } from "../engine/testUtils";
+import { getTierForRound } from "../engine/tournament";
 import { exportGroupsCSV } from "../utils/csvExport";
-import { Trophy, Swords, BarChart3, Crown, Eye, FlaskConical, History, Users, Armchair, Download } from "lucide-react";
+import { Trophy, Swords, BarChart3, Crown, Eye, FlaskConical, History, Users, Armchair, Download, UserCog } from "lucide-react";
 
 interface DashboardPageProps {
   state: TournamentState;
@@ -20,6 +22,9 @@ interface DashboardPageProps {
   onSubmitResults: (roundIndex: number, tableId: number, results: TableResult[]) => void;
   onBatchSubmitResults: (roundIndex: number, tables: { tableId: number; results: TableResult[] }[]) => void;
   onStartTop8: () => void;
+  onRenamePlayer: (id: string, name: string) => void;
+  onDropPlayer: (id: string) => void;
+  onAddPlayer: (name: string) => void;
   dramaticReveal: boolean;
   testMode: boolean;
 }
@@ -32,6 +37,9 @@ export function DashboardPage({
   onSubmitResults,
   onBatchSubmitResults,
   onStartTop8,
+  onRenamePlayer,
+  onDropPlayer,
+  onAddPlayer,
   dramaticReveal,
   testMode,
 }: DashboardPageProps) {
@@ -41,6 +49,7 @@ export function DashboardPage({
   const [leaderRevealDone, setLeaderRevealDone] = useState(false);
   const [manualLeaderReveal, setManualLeaderReveal] = useState(false);
   const [tablesRevealed, setTablesRevealed] = useState(false);
+  const [showPlayerManager, setShowPlayerManager] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastRevealedRound = useRef<number>(0);
 
@@ -153,7 +162,14 @@ export function DashboardPage({
           {state.metadata.tournamentName}
         </h1>
         <div className="flex items-center justify-center gap-4 text-xs text-sand-dark uppercase tracking-[0.2em]">
-          <span>{state.players.length} Players</span>
+          <button
+            onClick={() => setShowPlayerManager(true)}
+            className="inline-flex items-center gap-1 hover:text-spice transition-colors"
+            title="Manage Players"
+          >
+            <UserCog size={12} />
+            {state.players.length} Players
+          </button>
           <span className="text-spice">|</span>
           <span>
             Round {currentRound?.number ?? 0} / {state.settings.totalQualifyingRounds}
@@ -284,24 +300,34 @@ export function DashboardPage({
                   const isComplete = round.isComplete;
                   const inProgress =
                     !isComplete && round.tables.some((t) => t.isComplete);
+                  const tier = round.leaderTier ?? getTierForRound(round.number, false);
+                  const tierColors: Record<string, string> = { A: "#ef4444", B: "#c5a059", C: "#38bdf8" };
+                  const tierColor = tierColors[tier] ?? "#c5a059";
                   return (
-                    <button
-                      key={round.number}
-                      onClick={() => setDisplayRoundIndex(idx)}
-                      className={`px-4 py-2 text-xs uppercase tracking-widest rounded-sm border transition-all ${
-                        isActive
-                          ? "border-spice bg-spice/20 text-spice"
-                          : isComplete
-                          ? "border-spice/30 text-spice/60 hover:border-spice/50"
-                          : inProgress
-                          ? "border-fremen-blue/40 text-fremen-blue hover:border-fremen-blue/60"
-                          : "border-white/10 text-sand-dark hover:border-white/20"
-                      }`}
-                    >
-                      R{round.number}
-                      {isComplete && " \u2713"}
-                      {inProgress && !isComplete && " \u25CF"}
-                    </button>
+                    <div key={round.number} className="flex flex-col items-center gap-1">
+                      <span
+                        className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border"
+                        style={{ color: tierColor, borderColor: tierColor, background: `${tierColor}18` }}
+                      >
+                        {tier}
+                      </span>
+                      <button
+                        onClick={() => setDisplayRoundIndex(idx)}
+                        className={`px-4 py-2 text-xs uppercase tracking-widest rounded-sm border transition-all ${
+                          isActive
+                            ? "border-spice bg-spice/20 text-spice"
+                            : isComplete
+                            ? "border-spice/30 text-spice/60 hover:border-spice/50"
+                            : inProgress
+                            ? "border-fremen-blue/40 text-fremen-blue hover:border-fremen-blue/60"
+                            : "border-white/10 text-sand-dark hover:border-white/20"
+                        }`}
+                      >
+                        R{round.number}
+                        {isComplete && " \u2713"}
+                        {inProgress && !isComplete && " \u25CF"}
+                      </button>
+                    </div>
                   );
                 })}
             </div>
@@ -528,6 +554,16 @@ export function DashboardPage({
           />
         )}
       </AnimatePresence>
+
+      {/* Player Manager Modal */}
+      <PlayerManager
+        isOpen={showPlayerManager}
+        onClose={() => setShowPlayerManager(false)}
+        players={state.players}
+        onRenamePlayer={onRenamePlayer}
+        onDropPlayer={onDropPlayer}
+        onAddPlayer={onAddPlayer}
+      />
     </div>
   );
 }
