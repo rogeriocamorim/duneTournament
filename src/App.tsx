@@ -111,10 +111,10 @@ function App() {
     });
   }, [transitionTo, startTop8]);
 
-  const handleReset = useCallback(async () => {
+  const handleReset = useCallback(() => {
     setResetVerifying(true);
     setResetError(false);
-    const valid = await verifyResetPassphrase(resetPassphrase);
+    const valid = verifyResetPassphrase(resetPassphrase);
     if (valid) {
       resetTournament();
       setShowResetConfirm(false);
