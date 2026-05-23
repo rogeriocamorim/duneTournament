@@ -15,12 +15,18 @@ export async function createStandingsBin(
   standings: StandingsSnapshot,
   tournamentName: string
 ): Promise<string> {
+  // Sanitize tournament name for HTTP header (must be ISO-8859-1 safe)
+  const safeName = tournamentName
+    .replace(/[^\x20-\x7E]/g, "") // strip non-ASCII
+    .replace(/\s+/g, "-")
+    .slice(0, 64) || "tournament";
+
   const response = await fetch("https://api.jsonbin.io/v3/b", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Master-Key": JSONBIN_API_KEY,
-      "X-Bin-Name": `dune-tournament-${tournamentName.replace(/\s+/g, "-")}`,
+      "X-Bin-Name": `dune-${safeName}`,
       "X-Bin-Private": "false", // Make bin publicly readable
     },
     body: JSON.stringify(standings),
