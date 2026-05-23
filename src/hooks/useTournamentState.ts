@@ -678,6 +678,7 @@ export function useTournamentState() {
         currentRound: state.currentRound,
         totalRounds: state.settings.totalQualifyingRounds,
         phase: state.phase,
+        mode: state.mode,
       },
       standings: currentStandings.map((player, index) => ({
         rank: index + 1,
@@ -688,6 +689,8 @@ export function useTournamentState() {
         vpSharePct: getVpSharePct(player.id, state.rounds),
         efficiency: player.efficiency,
       })),
+      rounds: state.rounds,
+      players: state.players,
     };
 
     const baseUrl = window.location.origin + window.location.pathname;
