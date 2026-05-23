@@ -196,7 +196,7 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
           {hasFullData && <TabBtn tab="tables" icon={<Swords size={16} />} label="Tables" />}
           {hasFullData && isColosseum && <TabBtn tab="groups" icon={<Users size={16} />} label="Groups" />}
           <TabBtn tab="standings" icon={<BarChart3 size={16} />} label="Standings" />
-          {hasFullData && !isColosseum && <TabBtn tab="leaders" icon={<Crown size={16} />} label="Leaders" />}
+          {hasFullData && <TabBtn tab="leaders" icon={<Crown size={16} />} label="Leaders" />}
           {hasFullData && isColosseum && <TabBtn tab="seats" icon={<Armchair size={16} />} label="Seats" />}
           {hasFullData && completedRounds.length > 1 && <TabBtn tab="history" icon={<History size={16} />} label="History" />}
         </div>
@@ -340,8 +340,8 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
           </motion.div>
         )}
 
-        {/* ---- Leaders Tab (Classic only) ---- */}
-        {activeTab === "leaders" && hasFullData && !isColosseum && (
+        {/* ---- Leaders Tab ---- */}
+        {activeTab === "leaders" && hasFullData && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <LeaderStatsPanel rounds={rounds} />
           </motion.div>

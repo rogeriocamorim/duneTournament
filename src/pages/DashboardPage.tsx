@@ -229,19 +229,17 @@ export function DashboardPage({
           <BarChart3 size={16} />
           Standings
         </button>
-        {!isColosseum && (
-          <button
-            onClick={() => setActiveTab("leaders")}
-            className={`flex items-center gap-2 px-4 py-2 text-sm uppercase tracking-widest transition-all ${
-              activeTab === "leaders"
-                ? "text-spice border-b-2 border-spice"
-                : "text-sand-dark hover:text-sand"
-            }`}
-          >
-            <Crown size={16} />
-            Leaders
-          </button>
-        )}
+        <button
+          onClick={() => setActiveTab("leaders")}
+          className={`flex items-center gap-2 px-4 py-2 text-sm uppercase tracking-widest transition-all ${
+            activeTab === "leaders"
+              ? "text-spice border-b-2 border-spice"
+              : "text-sand-dark hover:text-sand"
+          }`}
+        >
+          <Crown size={16} />
+          Leaders
+        </button>
         {isColosseum && (
           <button
             onClick={() => setActiveTab("seats")}
@@ -512,7 +510,7 @@ export function DashboardPage({
         </motion.div>
       )}
 
-      {activeTab === "leaders" && !isColosseum && (
+      {activeTab === "leaders" && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
