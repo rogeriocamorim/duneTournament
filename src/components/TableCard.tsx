@@ -66,7 +66,7 @@ export function TableCard({
   const leaderOptions: string[] | undefined = isColosseum && leaderTier
     ? getLeadersByTier(leaderTier).map((l) => l.name)
     : availableLeaders;
-  const [editing, setEditing] = useState(!table.isComplete);
+  const [editing, setEditing] = useState(allowEdit && !table.isComplete);
   const [results, setResults] = useState<Record<string, LocalResult>>(
     () => {
       if (table.isComplete) {
