@@ -58,7 +58,7 @@ export function ShareModal({ isOpen, onClose, shareUrl }: ShareModalProps) {
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
           >
-            <div className="glass-morphism-strong rounded-sm p-8 max-w-2xl w-full relative">
+            <div className="glass-morphism-strong rounded-sm p-6 max-w-md w-full relative">
               {/* Close button */}
               <button
                 onClick={onClose}
@@ -71,18 +71,18 @@ export function ShareModal({ isOpen, onClose, shareUrl }: ShareModalProps) {
               <h2 className="text-display text-xl mb-1 text-spice spice-text-glow">
                 Share Tournament Standings
               </h2>
-              <p className="text-sm text-sand-dark mb-6 uppercase tracking-wider">
+              <p className="text-sm text-sand-dark mb-4 uppercase tracking-wider">
                 One Link for the Entire Tournament
               </p>
 
               {/* QR Code */}
-              <div className="flex justify-center mb-6">
-                <div className="bg-white p-6 rounded-sm">
+              <div className="flex justify-center mb-4">
+                <div className="bg-white p-3 rounded-sm">
                   <QRCodeSVG
                     value={shareUrl}
-                    size={512}
+                    size={200}
                     level="H"
-                    includeMargin={true}
+                    includeMargin={false}
                   />
                 </div>
               </div>
