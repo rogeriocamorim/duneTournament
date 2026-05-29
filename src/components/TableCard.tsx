@@ -285,157 +285,214 @@ export function TableCard({
           return (
             <div
               key={player.id}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 border-b border-white/5 last:border-0"
+              className="py-2 border-b border-white/5 last:border-0"
             >
-              {/* Position selector */}
-              {editing ? (
-                <select
-                  value={result?.position || 0}
-                  onChange={(e) =>
-                    handlePositionChange(player.id, parseInt(e.target.value))
-                  }
-                  className="bg-black/50 border border-spice/30 text-spice text-score px-2 py-1 rounded-sm w-14 text-center"
-                >
-                  <option value={0}>--</option>
-                  {Array.from({ length: table.playerIds.length }, (_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {i + 1}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <span
-                  className={`text-score text-lg w-14 text-center ${
-                    result?.position === 1
-                      ? "text-[#FFD700]"
-                      : result?.position === 2
-                      ? "text-[#C0C0C0]"
-                      : "text-sand-dark"
-                  }`}
-                >
-                  {result?.position || "-"}
+              {/* Line 1: Position, Name, VP, Points */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                {/* Position selector */}
+                {editing ? (
+                  <select
+                    value={result?.position || 0}
+                    onChange={(e) =>
+                      handlePositionChange(player.id, parseInt(e.target.value))
+                    }
+                    className="bg-black/50 border border-spice/30 text-spice text-score px-2 py-1 rounded-sm w-14 text-center"
+                  >
+                    <option value={0}>--</option>
+                    {Array.from({ length: table.playerIds.length }, (_, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        {i + 1}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span
+                    className={`text-score text-lg w-14 text-center ${
+                      result?.position === 1
+                        ? "text-[#FFD700]"
+                        : result?.position === 2
+                        ? "text-[#C0C0C0]"
+                        : "text-sand-dark"
+                    }`}
+                  >
+                    {result?.position || "-"}
+                  </span>
+                )}
+
+                {/* Player name */}
+                <span className="flex-1 text-display text-sm min-w-[8rem]">
+                  {player.name}
                 </span>
-              )}
 
-              {/* Player name */}
-              <span className="flex-1 text-display text-sm min-w-[8rem]">
-                {player.name}
-              </span>
+                {/* Read-only compact: Seat + Pick + Leader inline (Colosseum, completed) */}
+                {isColosseum && !editing && (
+                  <>
+                    {result?.seatPosition ? (
+                      <span className="text-xs text-sand-dark opacity-50 w-8 text-center">
+                        S{result.seatPosition}
+                      </span>
+                    ) : null}
+                    {result?.pickOrder ? (
+                      <span className="text-xs text-sand-dark opacity-50 w-8 text-center">
+                        P{result.pickOrder}
+                      </span>
+                    ) : null}
+                    {result?.leader ? (
+                      <span className="text-xs text-sand-dark opacity-70 truncate max-w-[8rem] text-center" title={result.leader}>
+                        {result.leader}
+                      </span>
+                    ) : null}
+                  </>
+                )}
 
-              {/* Seat Position selector (Colosseum only) */}
-              {isColosseum && editing && (
-                <select
-                  value={result?.seatPosition || 0}
-                  onChange={(e) =>
-                    handleSeatPositionChange(player.id, parseInt(e.target.value))
-                  }
-                  className="bg-black/50 border border-sand/20 text-sand text-xs px-1 py-1 rounded-sm w-16"
-                >
-                  <option value={0}>Seat</option>
-                  {[1, 2, 3, 4].map((s) => (
-                    <option key={s} value={s}>
-                      S{s}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {isColosseum && !editing && result?.seatPosition ? (
-                <span className="text-xs text-sand-dark opacity-50 w-10 text-center">
-                  S{result.seatPosition}
-                </span>
-              ) : null}
-
-              {/* Pick Order selector (Colosseum only) */}
-              {isColosseum && editing && (
-                <select
-                  value={result?.pickOrder || 0}
-                  onChange={(e) =>
-                    handlePickOrderChange(player.id, parseInt(e.target.value))
-                  }
-                  className="bg-black/50 border border-fremen-blue/30 text-sand text-xs px-1 py-1 rounded-sm w-16"
-                >
-                  <option value={0}>Pick</option>
-                  {[1, 2, 3, 4].map((p) => (
-                    <option key={p} value={p}>
-                      P{p}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {isColosseum && !editing && result?.pickOrder ? (
-                <span className="text-xs text-sand-dark opacity-50 w-10 text-center">
-                  P{result.pickOrder}
-                </span>
-              ) : null}
-
-              {/* Leader selector (Classic only — Colosseum is online, no leader selection) */}
-              {!isColosseum && editing ? (
-                <select
-                  value={result?.leader || ""}
-                  onChange={(e) =>
-                    handleLeaderChange(player.id, e.target.value)
-                  }
-                  className="bg-black/50 border border-spice/30 text-sand text-xs px-1 py-1 rounded-sm w-36 truncate"
-                >
-                  <option value="">Leader...</option>
-                  {leaderOptions ? (
-                    // Show leaders from available pool (or full tier in Colosseum)
-                    leaderOptions.map((name) => {
-                      const info = LEADER_LIST.find((l) => l.name === name);
-                      return (
-                        <option key={info?.id ?? name} value={name}>
-                          {name}
-                        </option>
-                      );
-                    })
-                  ) : (
-                    // Unfiltered: show all leaders grouped by expansion
-                    (["base", "ix", "uprising", "bloodlines"] as const).map((exp) => {
-                      const leadersByExp = LEADER_LIST.filter((l) => l.expansion === exp);
-                      if (leadersByExp.length === 0) return null;
-                      return (
-                        <optgroup key={exp} label={exp.charAt(0).toUpperCase() + exp.slice(1)}>
-                          {leadersByExp.map((l) => (
-                            <option key={l.id} value={l.name}>
-                              {l.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      );
-                    })
-                  )}
-                </select>
-              ) : (
-                !isColosseum && result?.leader && (
+                {/* Leader display (Classic, read-only) */}
+                {!isColosseum && !editing && result?.leader && (
                   <span className="text-xs text-sand-dark opacity-70 w-36 truncate text-center" title={result.leader}>
                     {result.leader}
                   </span>
-                )
+                )}
+
+                {/* VP input */}
+                {editing ? (
+                  <input
+                    type="number"
+                    min={0}
+                    value={result?.vp || ""}
+                    onChange={(e) =>
+                      handleVpChange(player.id, parseInt(e.target.value) || 0)
+                    }
+                    placeholder="VP"
+                    className="bg-black/50 border border-spice/30 text-score text-sm px-2 py-1 rounded-sm w-16 text-center text-white"
+                  />
+                ) : (
+                  <span className="text-score text-sm opacity-60 w-16 text-center">
+                    {result?.vp || 0} VP
+                  </span>
+                )}
+
+                {/* Points display */}
+                {!editing && result?.position && (
+                  <span className="text-score text-spice text-sm w-12 text-right">
+                    +{[6, 3, 2, 1][result.position - 1] || 0}
+                  </span>
+                )}
+              </div>
+
+              {/* Line 2: Seat + Pick + Leader (Colosseum editing only) */}
+              {isColosseum && editing && (
+                <div className="flex items-center gap-3 mt-1 ml-[4.25rem]">
+                  {/* Seat */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-sand-dark uppercase tracking-widest">Seat</span>
+                    <select
+                      value={result?.seatPosition || 0}
+                      onChange={(e) =>
+                        handleSeatPositionChange(player.id, parseInt(e.target.value))
+                      }
+                      className="bg-black/50 border border-sand/20 text-sand text-xs px-1 py-1 rounded-sm w-14"
+                    >
+                      <option value={0}>--</option>
+                      {[1, 2, 3, 4].map((s) => (
+                        <option key={s} value={s}>
+                          S{s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Pick Order */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-sand-dark uppercase tracking-widest">Pick</span>
+                    <select
+                      value={result?.pickOrder || 0}
+                      onChange={(e) =>
+                        handlePickOrderChange(player.id, parseInt(e.target.value))
+                      }
+                      className="bg-black/50 border border-fremen-blue/30 text-sand text-xs px-1 py-1 rounded-sm w-14"
+                    >
+                      <option value={0}>--</option>
+                      {[1, 2, 3, 4].map((p) => (
+                        <option key={p} value={p}>
+                          P{p}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Leader selector */}
+                  <select
+                    value={result?.leader || ""}
+                    onChange={(e) =>
+                      handleLeaderChange(player.id, e.target.value)
+                    }
+                    className="bg-black/50 border border-spice/30 text-sand text-xs px-1 py-1 rounded-sm flex-1 truncate"
+                  >
+                    <option value="">Leader...</option>
+                    {leaderOptions ? (
+                      leaderOptions.map((name) => {
+                        const info = LEADER_LIST.find((l) => l.name === name);
+                        return (
+                          <option key={info?.id ?? name} value={name}>
+                            {name}
+                          </option>
+                        );
+                      })
+                    ) : (
+                      (["base", "ix", "uprising", "bloodlines"] as const).map((exp) => {
+                        const leadersByExp = LEADER_LIST.filter((l) => l.expansion === exp);
+                        if (leadersByExp.length === 0) return null;
+                        return (
+                          <optgroup key={exp} label={exp.charAt(0).toUpperCase() + exp.slice(1)}>
+                            {leadersByExp.map((l) => (
+                              <option key={l.id} value={l.name}>
+                                {l.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        );
+                      })
+                    )}
+                  </select>
+                </div>
               )}
 
-              {/* VP input */}
-              {editing ? (
-                <input
-                  type="number"
-                  min={0}
-                  value={result?.vp || ""}
-                  onChange={(e) =>
-                    handleVpChange(player.id, parseInt(e.target.value) || 0)
-                  }
-                  placeholder="VP"
-                  className="bg-black/50 border border-spice/30 text-score text-sm px-2 py-1 rounded-sm w-16 text-center text-white"
-                />
-              ) : (
-                <span className="text-score text-sm opacity-60 w-16 text-center">
-                  {result?.vp || 0} VP
-                </span>
-              )}
-
-              {/* Points display */}
-              {!editing && result?.position && (
-                <span className="text-score text-spice text-sm w-12 text-right">
-                  +{[6, 3, 2, 1][result.position - 1] || 0}
-                </span>
+              {/* Line 2: Leader selector (Classic editing only) */}
+              {!isColosseum && editing && (
+                <div className="flex items-center gap-3 mt-1 ml-[4.25rem]">
+                  <select
+                    value={result?.leader || ""}
+                    onChange={(e) =>
+                      handleLeaderChange(player.id, e.target.value)
+                    }
+                    className="bg-black/50 border border-spice/30 text-sand text-xs px-1 py-1 rounded-sm w-36 truncate"
+                  >
+                    <option value="">Leader...</option>
+                    {leaderOptions ? (
+                      leaderOptions.map((name) => {
+                        const info = LEADER_LIST.find((l) => l.name === name);
+                        return (
+                          <option key={info?.id ?? name} value={name}>
+                            {name}
+                          </option>
+                        );
+                      })
+                    ) : (
+                      (["base", "ix", "uprising", "bloodlines"] as const).map((exp) => {
+                        const leadersByExp = LEADER_LIST.filter((l) => l.expansion === exp);
+                        if (leadersByExp.length === 0) return null;
+                        return (
+                          <optgroup key={exp} label={exp.charAt(0).toUpperCase() + exp.slice(1)}>
+                            {leadersByExp.map((l) => (
+                              <option key={l.id} value={l.name}>
+                                {l.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        );
+                      })
+                    )}
+                  </select>
+                </div>
               )}
             </div>
           );
