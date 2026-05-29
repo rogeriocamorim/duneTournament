@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useEffect } from "react";
+import { useReducer, useCallback, useEffect, useRef } from "react";
 import type { TournamentState, TournamentMode, Round, TableResult } from "../engine/types";
 import { DEFAULT_STATE } from "../engine/types";
 import {
@@ -556,6 +556,49 @@ export function useTournamentState() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
+
+  // Auto-sync to JSONBin when rounds change (debounced 2s)
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!state.metadata.jsonbinId || state.rounds.length === 0) return;
+
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(() => {
+      const currentStandings = state.phase === "finished"
+        ? getFinalStandings(state)
+        : getStandings(state.players, state.rounds);
+
+      const snapshot: StandingsSnapshot = {
+        metadata: {
+          tournamentName: state.metadata.tournamentName,
+          timestamp: new Date().toISOString(),
+          currentRound: state.currentRound,
+          totalRounds: state.settings.totalQualifyingRounds,
+          phase: state.phase,
+          mode: state.mode,
+        },
+        standings: currentStandings.map((player, index) => ({
+          rank: index + 1,
+          name: player.name,
+          points: player.points,
+          wins: player.wins,
+          totalVP: player.totalVP,
+          vpSharePct: getVpSharePct(player.id, state.rounds),
+          efficiency: player.efficiency,
+        })),
+        rounds: state.rounds,
+        players: state.players,
+      };
+
+      updateStandingsBin(state.metadata.jsonbinId!, snapshot).catch((err) => {
+        console.warn("Auto-sync to JSONBin failed:", err);
+      });
+    }, 2000);
+
+    return () => {
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    };
+  }, [state.rounds, state.players, state.phase]);
 
   // ===== Action creators =====
 

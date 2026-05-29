@@ -215,7 +215,7 @@ export function DashboardPage({
             }`}
           >
             <Users size={16} />
-            Groups
+            Standings
           </button>
         )}
         <button
@@ -227,7 +227,7 @@ export function DashboardPage({
           }`}
         >
           <BarChart3 size={16} />
-          Standings
+          Overall
         </button>
         <button
           onClick={() => setActiveTab("leaders")}
@@ -407,7 +407,7 @@ export function DashboardPage({
                 enabled={dramaticReveal && !currentRound.isComplete && (isColosseum || leaderRevealDone)}
                 labels={currentRound.tables.map((t) => `Table #${t.id}`)}
                 onAllRevealed={() => setTablesRevealed(true)}
-                gridClass={isColosseum ? "grid grid-cols-1 gap-4 max-w-2xl mx-auto" : "grid grid-cols-1 md:grid-cols-2 gap-4"}
+                gridClass="grid grid-cols-1 md:grid-cols-2 gap-4"
                 items={currentRound.tables.map((table, index) => (
                   <TableCard
                     key={`r${currentRound.number}-t${table.id}`}

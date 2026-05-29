@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { AlertTriangle, RefreshCw, Swords, BarChart3, Crown, Users, Armchair, History } from "lucide-react";
+import { AlertTriangle, RefreshCw, Swords, BarChart3, Users, History } from "lucide-react";
 import { Leaderboard } from "../components/Leaderboard";
 import { GroupStandings } from "../components/GroupStandings";
-import { LeaderStatsPanel } from "../components/LeaderStatsPanel";
-import { SeatPickStatsPanel } from "../components/SeatPickStatsPanel";
 import { RoundHistory } from "../components/RoundHistory";
 import { TableCard } from "../components/TableCard";
 import { fetchStandingsBin } from "../utils/jsonbinService";
@@ -194,10 +192,8 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
         {/* Tab Bar */}
         <div className="flex justify-center gap-1 mb-6 flex-wrap border-b border-white/10 pb-2">
           {hasFullData && <TabBtn tab="tables" icon={<Swords size={16} />} label="Tables" />}
-          {hasFullData && isColosseum && <TabBtn tab="groups" icon={<Users size={16} />} label="Groups" />}
-          <TabBtn tab="standings" icon={<BarChart3 size={16} />} label="Standings" />
-          {hasFullData && <TabBtn tab="leaders" icon={<Crown size={16} />} label="Leaders" />}
-          {hasFullData && isColosseum && <TabBtn tab="seats" icon={<Armchair size={16} />} label="Seats" />}
+          {hasFullData && isColosseum && <TabBtn tab="groups" icon={<Users size={16} />} label="Standings" />}
+          <TabBtn tab="standings" icon={<BarChart3 size={16} />} label="Overall" />
           {hasFullData && completedRounds.length > 1 && <TabBtn tab="history" icon={<History size={16} />} label="History" />}
         </div>
 
@@ -259,7 +255,7 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
                     ? "Grand Final"
                     : currentRound.type}
                 </h2>
-                <div className={isColosseum ? "grid grid-cols-1 gap-4 max-w-2xl mx-auto" : "grid grid-cols-1 md:grid-cols-2 gap-4"}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {currentRound.tables.map((table, index) => (
                     <TableCard
                       key={`r${currentRound.number}-t${table.id}`}
@@ -337,20 +333,6 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
             ) : (
               <Leaderboard players={standingsPlayers} vpSharePctMap={vpSharePctMap} />
             )}
-          </motion.div>
-        )}
-
-        {/* ---- Leaders Tab ---- */}
-        {activeTab === "leaders" && hasFullData && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <LeaderStatsPanel rounds={rounds} />
-          </motion.div>
-        )}
-
-        {/* ---- Seats Tab (Colosseum only) ---- */}
-        {activeTab === "seats" && hasFullData && isColosseum && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <SeatPickStatsPanel rounds={rounds} />
           </motion.div>
         )}
 
