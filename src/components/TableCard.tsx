@@ -332,11 +332,6 @@ export function TableCard({
                         S{result.seatPosition}
                       </span>
                     ) : null}
-                    {result?.pickOrder ? (
-                      <span className="text-xs text-sand-dark opacity-50 w-8 text-center">
-                        P{result.pickOrder}
-                      </span>
-                    ) : null}
                     {result?.leader ? (
                       <span className="text-xs text-sand-dark opacity-70 truncate max-w-[8rem] text-center" title={result.leader}>
                         {result.leader}
@@ -378,7 +373,7 @@ export function TableCard({
                 )}
               </div>
 
-              {/* Line 2: Seat + Pick + Leader (Colosseum editing only) */}
+              {/* Line 2: Seat + Leader (Colosseum editing only) */}
               {isColosseum && editing && (
                 <div className="flex items-center gap-3 mt-1 ml-[4.25rem]">
                   {/* Seat */}
@@ -400,59 +395,43 @@ export function TableCard({
                     </select>
                   </div>
 
-                  {/* Pick Order */}
-                  <div className="flex items-center gap-1">
+                  {/* Leader selector (Pick) */}
+                  <div className="flex items-center gap-1 flex-1">
                     <span className="text-[10px] text-sand-dark uppercase tracking-widest">Pick</span>
                     <select
-                      value={result?.pickOrder || 0}
+                      value={result?.leader || ""}
                       onChange={(e) =>
-                        handlePickOrderChange(player.id, parseInt(e.target.value))
+                        handleLeaderChange(player.id, e.target.value)
                       }
-                      className="bg-black/50 border border-fremen-blue/30 text-sand text-xs px-1 py-1 rounded-sm w-14"
+                      className="bg-black/50 border border-spice/30 text-sand text-xs px-1 py-1 rounded-sm flex-1 truncate"
                     >
-                      <option value={0}>--</option>
-                      {[1, 2, 3, 4].map((p) => (
-                        <option key={p} value={p}>
-                          P{p}
-                        </option>
-                      ))}
+                      <option value="">Leader...</option>
+                      {leaderOptions ? (
+                        leaderOptions.map((name) => {
+                          const info = LEADER_LIST.find((l) => l.name === name);
+                          return (
+                            <option key={info?.id ?? name} value={name}>
+                              {name}
+                            </option>
+                          );
+                        })
+                      ) : (
+                        (["base", "ix", "uprising", "bloodlines"] as const).map((exp) => {
+                          const leadersByExp = LEADER_LIST.filter((l) => l.expansion === exp);
+                          if (leadersByExp.length === 0) return null;
+                          return (
+                            <optgroup key={exp} label={exp.charAt(0).toUpperCase() + exp.slice(1)}>
+                              {leadersByExp.map((l) => (
+                                <option key={l.id} value={l.name}>
+                                  {l.name}
+                                </option>
+                              ))}
+                            </optgroup>
+                          );
+                        })
+                      )}
                     </select>
                   </div>
-
-                  {/* Leader selector */}
-                  <select
-                    value={result?.leader || ""}
-                    onChange={(e) =>
-                      handleLeaderChange(player.id, e.target.value)
-                    }
-                    className="bg-black/50 border border-spice/30 text-sand text-xs px-1 py-1 rounded-sm flex-1 truncate"
-                  >
-                    <option value="">Leader...</option>
-                    {leaderOptions ? (
-                      leaderOptions.map((name) => {
-                        const info = LEADER_LIST.find((l) => l.name === name);
-                        return (
-                          <option key={info?.id ?? name} value={name}>
-                            {name}
-                          </option>
-                        );
-                      })
-                    ) : (
-                      (["base", "ix", "uprising", "bloodlines"] as const).map((exp) => {
-                        const leadersByExp = LEADER_LIST.filter((l) => l.expansion === exp);
-                        if (leadersByExp.length === 0) return null;
-                        return (
-                          <optgroup key={exp} label={exp.charAt(0).toUpperCase() + exp.slice(1)}>
-                            {leadersByExp.map((l) => (
-                              <option key={l.id} value={l.name}>
-                                {l.name}
-                              </option>
-                            ))}
-                          </optgroup>
-                        );
-                      })
-                    )}
-                  </select>
                 </div>
               )}
 

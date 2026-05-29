@@ -229,18 +229,20 @@ export function DashboardPage({
           <BarChart3 size={16} />
           Overall
         </button>
-        <button
-          onClick={() => setActiveTab("leaders")}
-          className={`flex items-center gap-2 px-4 py-2 text-sm uppercase tracking-widest transition-all ${
-            activeTab === "leaders"
-              ? "text-spice border-b-2 border-spice"
-              : "text-sand-dark hover:text-sand"
-          }`}
-        >
-          <Crown size={16} />
-          Leaders
-        </button>
-        {isColosseum && (
+        {state.phase === "finished" && (
+          <button
+            onClick={() => setActiveTab("leaders")}
+            className={`flex items-center gap-2 px-4 py-2 text-sm uppercase tracking-widest transition-all ${
+              activeTab === "leaders"
+                ? "text-spice border-b-2 border-spice"
+                : "text-sand-dark hover:text-sand"
+            }`}
+          >
+            <Crown size={16} />
+            Leaders
+          </button>
+        )}
+        {isColosseum && state.phase === "finished" && (
           <button
             onClick={() => setActiveTab("seats")}
             className={`flex items-center gap-2 px-4 py-2 text-sm uppercase tracking-widest transition-all ${
@@ -510,7 +512,7 @@ export function DashboardPage({
         </motion.div>
       )}
 
-      {activeTab === "leaders" && (
+      {activeTab === "leaders" && state.phase === "finished" && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -519,7 +521,7 @@ export function DashboardPage({
         </motion.div>
       )}
 
-      {activeTab === "seats" && isColosseum && (
+      {activeTab === "seats" && isColosseum && state.phase === "finished" && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
