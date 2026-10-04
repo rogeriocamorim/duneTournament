@@ -3,16 +3,17 @@
 #
 #   ./deploy/deploy.sh dev            # Orange Pi test server (default 192.168.2.13)
 #   ./deploy/deploy.sh prod           # production server (set PROD_HOST)
-#   ./deploy/deploy.sh dev status|logs [service]|stop|backup|token
+#   ./deploy/deploy.sh dev status|logs [service]|stop|backup|token|ports
 #
 # Settings (environment variables):
 #   SSH_USER   default root
 #   SSH_KEY    default ~/.ssh/id_rsa_dunerank
-#   DEV_HOST   default 192.168.2.13      DEV_PORT   default 8090
+#   DEV_HOST   default 192.168.2.13      DEV_PORT   first port to try (default 8090)
 #   PROD_HOST  required for prod        PROD_PORT  default 8080
 #
-# The first deploy creates <remote dir>/.env with a random database password
-# and organizer token. It is never overwritten; edit it on the server.
+# The first deploy picks the first free port from DEV_PORT/PROD_PORT up to 8199
+# and creates <remote dir>/.env with it, a random database password and an
+# organizer token. It is never overwritten; edit it on the server.
 
 set -euo pipefail
 
@@ -65,14 +66,31 @@ sync_files() {
     "$REPO_ROOT/" "$SSH_USER@$HOST:$REMOTE_DIR/"
 }
 
+# Print the first port from $1 to 8199 that nothing listens on and Docker does not publish
+FREE_PORT_SCRIPT='
+start=$1
+used=$( { ss -ltnH 2>/dev/null | awk "{print \$4}" | sed "s/.*://";
+          docker ps --format "{{.Ports}}" 2>/dev/null | grep -oE ":[0-9]+->" | tr -dc "0-9\\n"; } | sort -un)
+for p in $(seq "$start" 8199); do
+  if ! printf "%s\n" "$used" | grep -qx "$p"; then echo "$p"; exit 0; fi
+done
+exit 1
+'
+
 ensure_env() {
-  # Create .env once with random secrets; keep it on later deploys
-  remote "cd $REMOTE_DIR && if [ ! -f .env ]; then
-    printf 'WEB_PORT=%s\nPOSTGRES_DB=dune_tournament\nPOSTGRES_USER=dune\nPOSTGRES_PASSWORD=%s\nADMIN_TOKEN=%s\n' \
-      '$PORT' \"\$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')\" \"\$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')\" > .env
-    chmod 600 .env
-    echo 'Created .env with new secrets.'
-  fi"
+  # Create .env once with a free web port and random secrets; keep it on later deploys
+  if ! remote "test -f $REMOTE_DIR/.env"; then
+    local port
+    port="$(remote "bash -s -- $PORT" <<< "$FREE_PORT_SCRIPT")" || {
+      echo "No free port between $PORT and 8199 on $HOST"; exit 1; }
+    echo -e "${BLUE}Using free port $port on $HOST${NC}"
+    remote "cd $REMOTE_DIR && printf 'WEB_PORT=%s\nPOSTGRES_DB=dune_tournament\nPOSTGRES_USER=dune\nPOSTGRES_PASSWORD=%s\nADMIN_TOKEN=%s\n' \
+      '$port' \"\$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')\" \"\$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')\" > .env
+      chmod 600 .env
+      echo 'Created .env with new secrets.'"
+  fi
+  # The port in .env wins (it may have been chosen or edited on the server)
+  PORT="$(remote "grep '^WEB_PORT=' $REMOTE_DIR/.env | cut -d= -f2")"
 }
 
 case "$COMMAND" in
@@ -95,6 +113,11 @@ case "$COMMAND" in
     ;;
   status)
     compose "ps"
+    ;;
+  ports)
+    echo -e "${BLUE}Ports in use on $HOST:${NC}"
+    remote "ss -ltnH | awk '{print \$4}' | sed 's/.*://' | sort -un | tr '\n' ' '; echo"
+    echo -e "${BLUE}Next free port from $PORT:${NC} $(remote "bash -s -- $PORT" <<< "$FREE_PORT_SCRIPT")"
     ;;
   logs)
     compose "logs -f --tail=200 ${3:-}"

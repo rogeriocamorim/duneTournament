@@ -94,17 +94,18 @@ cd server && TEST_DATABASE_URL=postgres://dune:dune@localhost:5432/dune_tourname
 
 | Branch | Where | How |
 |--------|-------|-----|
-| `dev`  | Orange Pi test server, `192.168.2.13:8090` | `./deploy/deploy.sh dev` |
+| `dev`  | Orange Pi test server, `192.168.2.13` (first free port from 8090) | `./deploy/deploy.sh dev` |
 | `main` | GitHub Pages (browser mode) | GitHub Actions on push |
 | `main` | Production server (Docker) | `PROD_HOST=<server> ./deploy/deploy.sh prod` |
 
 `deploy/deploy.sh` copies the repo to the server over SSH and runs `docker compose up -d --build` there.
 - **SSH**: user `root` with key `~/.ssh/id_rsa_dunerank`. Override with `SSH_USER` and `SSH_KEY`.
-- **First deploy**: creates the server's `.env` with a random database password and organizer token.
+- **First deploy**: picks the first free port on the server (from 8090 up to 8199, skipping ports in use and ports published by Docker) and creates the server's `.env` with that port, a random database password and an organizer token. The script prints the URL at the end.
 - **Other commands**:
 
 ```bash
 ./deploy/deploy.sh dev token     # show the organizer token
+./deploy/deploy.sh dev ports     # ports in use + next free port
 ./deploy/deploy.sh dev status    # container status
 ./deploy/deploy.sh dev logs api  # follow API logs
 ./deploy/deploy.sh dev backup    # pg_dump into ./backups/
