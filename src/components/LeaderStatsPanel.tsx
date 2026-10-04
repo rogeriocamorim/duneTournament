@@ -1,19 +1,24 @@
 import { motion } from "motion/react";
 import { useState } from "react";
-import type { Round, LeaderTier, StatsPhase } from "../engine/types";
+import type { Round, StatsPhase, TierDef } from "../engine/types";
 import { getLeaderStatsByPhase } from "../engine/tournament";
+import { TIER_PRESETS, getTierColor } from "../engine/format";
 import { Layers, Swords, Trophy } from "lucide-react";
 
 interface LeaderStatsPanelProps {
   rounds: Round[];
+  /** Tournament tiers (defaults to the classic A/B/C tiers) */
+  tiers?: TierDef[];
 }
 
-const TIER_STYLES: Record<LeaderTier, { label: string; color: string }> = {
-  A: { label: "A", color: "bg-red-500/20 text-red-400 border-red-500/40" },
-  B: { label: "B", color: "bg-spice/20 text-spice border-spice/40" },
-  C: { label: "C", color: "bg-sky-500/20 text-sky-400 border-sky-500/40" },
-  none: { label: "—", color: "bg-white/5 text-sand-dark border-white/10" },
-};
+/** Inline badge style for a tier code */
+function tierBadgeStyle(tiers: TierDef[], code: string) {
+  if (code === "none" || !tiers.some((t) => t.code === code)) {
+    return { color: "#a8a29e", background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)" };
+  }
+  const color = getTierColor(tiers, code);
+  return { color, background: `${color}33`, borderColor: `${color}66` };
+}
 
 const PHASE_OPTIONS: { key: StatsPhase; label: string; icon: typeof Layers }[] = [
   { key: "all", label: "Overall", icon: Layers },
@@ -21,9 +26,9 @@ const PHASE_OPTIONS: { key: StatsPhase; label: string; icon: typeof Layers }[] =
   { key: "bracket", label: "Bracket", icon: Trophy },
 ];
 
-const BRACKET_TYPES = new Set(["semifinal", "winners-final", "losers-final", "grand-final"]);
+const BRACKET_TYPES = new Set(["semifinal", "winners-final", "losers-final", "grand-final", "stage"]);
 
-export function LeaderStatsPanel({ rounds }: LeaderStatsPanelProps) {
+export function LeaderStatsPanel({ rounds, tiers = TIER_PRESETS[1].tiers }: LeaderStatsPanelProps) {
   const [phase, setPhase] = useState<StatsPhase>("all");
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
 
@@ -42,7 +47,7 @@ export function LeaderStatsPanel({ rounds }: LeaderStatsPanelProps) {
   const validRoundNums = new Set(phaseRounds.map((r) => r.number));
   const effectiveRound = selectedRound !== null && validRoundNums.has(selectedRound) ? selectedRound : null;
 
-  const stats = getLeaderStatsByPhase(rounds, phase, effectiveRound ?? undefined);
+  const stats = getLeaderStatsByPhase(rounds, phase, effectiveRound ?? undefined, tiers);
 
   if (stats.length === 0 && phaseRounds.length === 0) {
     return (
@@ -128,7 +133,6 @@ export function LeaderStatsPanel({ rounds }: LeaderStatsPanelProps) {
 
         {/* Rows */}
         {stats.map((stat, index) => {
-          const tierStyle = TIER_STYLES[stat.tier];
           return (
             <motion.div
               key={stat.leader}
@@ -139,10 +143,11 @@ export function LeaderStatsPanel({ rounds }: LeaderStatsPanelProps) {
             >
               {/* Tier badge */}
               <span
-                className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-sm border ${tierStyle.color}`}
+                className="text-xs font-bold w-6 h-6 flex items-center justify-center rounded-sm border"
+                style={tierBadgeStyle(tiers, stat.tier)}
                 title={`Tier ${stat.tier}`}
               >
-                {tierStyle.label}
+                {stat.tier === "none" ? "—" : stat.tier}
               </span>
 
               <span className="text-display text-sm truncate self-center" title={stat.leader}>
@@ -178,21 +183,19 @@ export function LeaderStatsPanel({ rounds }: LeaderStatsPanelProps) {
 
       {/* Tier legend */}
       <div className="flex items-center justify-center gap-4 pt-2">
-        {(["A", "B", "C"] as LeaderTier[]).map((tier) => {
-          const style = TIER_STYLES[tier];
-          return (
-            <div key={tier} className="flex items-center gap-1.5">
-              <span
-                className={`text-xs font-bold w-5 h-5 flex items-center justify-center rounded-sm border ${style.color}`}
-              >
-                {style.label}
-              </span>
-              <span className="text-xs text-sand-dark">
-                Tier {tier}
-              </span>
-            </div>
-          );
-        })}
+        {tiers.map((tier) => (
+          <div key={tier.code} className="flex items-center gap-1.5">
+            <span
+              className="text-xs font-bold w-5 h-5 flex items-center justify-center rounded-sm border"
+              style={tierBadgeStyle(tiers, tier.code)}
+            >
+              {tier.code}
+            </span>
+            <span className="text-xs text-sand-dark">
+              {tier.label}
+            </span>
+          </div>
+        ))}
       </div>
 
       {/* Summary footer */}

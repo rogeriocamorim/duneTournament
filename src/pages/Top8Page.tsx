@@ -8,6 +8,7 @@ import { RoundHistory } from "../components/RoundHistory";
 import { LeaderReveal } from "../components/animations/LeaderReveal";
 import type { TournamentState, TableResult } from "../engine/types";
 import { getTop8, getFinalStandings } from "../engine/tournament";
+import { getTableCardRoundProps, getTierColor, getTiers } from "../engine/format";
 import { generateRandomTableResults } from "../engine/testUtils";
 import { GroupStandings } from "../components/GroupStandings";
 import { SeatPickStatsPanel } from "../components/SeatPickStatsPanel";
@@ -49,6 +50,7 @@ export function Top8Page({
 
   const isColosseum = state.mode === "colosseum";
   const top8 = getTop8(state);
+  const tiers = getTiers(state);
 
   const top8Rounds = state.rounds.filter(
     (r) =>
@@ -114,6 +116,20 @@ export function Top8Page({
   }, [lastElimRound, state.rounds, state.mode, onBatchSubmitResults]);
 
   const isFinished = state.phase === "finished";
+  const roundProps = currentRound ? getTableCardRoundProps(state, currentRound) : undefined;
+  /** Tier badge for the current bracket round (falls back to the classic label) */
+  const tierBadge = (fallback: string) => {
+    const label = currentRound?.leaderTier ?? fallback;
+    const color = getTierColor(tiers, label);
+    return (
+      <span
+        className="ml-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest rounded-sm border align-middle"
+        style={{ color, borderColor: `${color}66`, background: `${color}22` }}
+      >
+        Tier {label}
+      </span>
+    );
+  };
 
   // Compute final standings that respect Grand Final placement
   const finalStandings = isFinished ? getFinalStandings(state) : undefined;
@@ -287,9 +303,7 @@ export function Top8Page({
                   {/* Colosseum: Semifinals (tables 0-1) + Eliminators (tables 2-3) — A Tier */}
                   <h2 className="text-display text-sm text-center text-sand-dark mb-4">
                     Round {currentRound.number} &mdash; Semifinals
-                    <span className="ml-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest bg-spice/20 text-spice border border-spice/30 rounded-sm align-middle">
-                      Tier A
-                    </span>
+                    {tierBadge("A")}
                   </h2>
                   <DramaticReveal
                     roundKey={`colosseum-sf-r${currentRound.number}`}
@@ -307,9 +321,7 @@ export function Top8Page({
                           onSubmitResults={onSubmitResults}
                           animationDelay={dramaticReveal ? 0 : index}
                           allowEdit
-                          availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
-                          leaderTier={isColosseum ? undefined : currentRound.leaderTier}
-                          mode={state.mode}
+                          {...roundProps}
                         />
                       </div>
                     ))}
@@ -317,9 +329,7 @@ export function Top8Page({
 
                   <h2 className="text-display text-sm text-center text-sand-dark mb-4 mt-6">
                     Round {currentRound.number} &mdash; Eliminators
-                    <span className="ml-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest bg-spice/20 text-spice border border-spice/30 rounded-sm align-middle">
-                      Tier A
-                    </span>
+                    {tierBadge("A")}
                   </h2>
                   <DramaticReveal
                     roundKey={`colosseum-elim-r${currentRound.number}`}
@@ -337,9 +347,7 @@ export function Top8Page({
                           onSubmitResults={onSubmitResults}
                           animationDelay={dramaticReveal ? 0 : index + 2}
                           allowEdit
-                          availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
-                          leaderTier={isColosseum ? undefined : currentRound.leaderTier}
-                          mode={state.mode}
+                          {...roundProps}
                         />
                       </div>
                     ))}
@@ -367,9 +375,7 @@ export function Top8Page({
                           onSubmitResults={onSubmitResults}
                           animationDelay={dramaticReveal ? 0 : index}
                           allowEdit
-                          availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
-                          leaderTier={isColosseum ? undefined : currentRound.leaderTier}
-                          mode={state.mode}
+                          {...roundProps}
                         />
                       </div>
                     ))}
@@ -394,9 +400,7 @@ export function Top8Page({
                           onSubmitResults={onSubmitResults}
                           animationDelay={dramaticReveal ? 0 : index + 2}
                           allowEdit
-                          availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
-                          leaderTier={isColosseum ? undefined : currentRound.leaderTier}
-                          mode={state.mode}
+                          {...roundProps}
                         />
                       </div>
                     ))}
@@ -414,9 +418,7 @@ export function Top8Page({
                   {/* Colosseum SF2: 2 competitive tables (no bye) — B Tier */}
                   <h2 className="text-display text-sm text-center text-sand-dark mb-4">
                     Round {currentRound.number} &mdash; Semifinal 2
-                    <span className="ml-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest bg-fremen-blue/20 text-fremen-blue border border-fremen-blue/30 rounded-sm align-middle">
-                      Tier B
-                    </span>
+                    {tierBadge("B")}
                   </h2>
                   <DramaticReveal
                     roundKey={`colosseum-sf2-r${currentRound.number}`}
@@ -434,9 +436,7 @@ export function Top8Page({
                           onSubmitResults={onSubmitResults}
                           animationDelay={dramaticReveal ? 0 : index}
                           allowEdit
-                          availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
-                          leaderTier={isColosseum ? undefined : currentRound.leaderTier}
-                          mode={state.mode}
+                          {...roundProps}
                         />
                       </div>
                     ))}
@@ -484,9 +484,7 @@ export function Top8Page({
                           onSubmitResults={onSubmitResults}
                           animationDelay={dramaticReveal ? 0 : index}
                           allowEdit
-                          availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
-                          leaderTier={isColosseum ? undefined : currentRound.leaderTier}
-                          mode={state.mode}
+                          {...roundProps}
                         />
                       </div>
                     ))}
@@ -501,11 +499,7 @@ export function Top8Page({
             <>
               <h2 className="text-display text-sm text-center text-sand-dark mb-4">
                 Round {currentRound.number} &mdash; Grand Final
-                {isColosseum && (
-                  <span className="ml-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest bg-blood/20 text-blood border border-blood/30 rounded-sm align-middle">
-                    Tier C
-                  </span>
-                )}
+                {currentRound.leaderTier ? tierBadge("C") : isColosseum && tierBadge("C")}
               </h2>
               <DramaticReveal
                 roundKey={`grand-final-r${currentRound.number}`}
@@ -521,9 +515,7 @@ export function Top8Page({
                       onSubmitResults={onSubmitResults}
                       animationDelay={dramaticReveal ? 0 : index}
                       allowEdit
-                      availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
-                      leaderTier={isColosseum ? undefined : currentRound.leaderTier}
-                      mode={state.mode}
+                      {...roundProps}
                     />
                   </div>
                 ))}
@@ -590,7 +582,7 @@ export function Top8Page({
                   rounds={state.rounds.filter((r) => r.type === "qualifying")}
                 />
               ) : (
-                <Leaderboard players={state.players} highlightTop={16} finalStandings={finalStandings} rounds={state.rounds} />
+                <Leaderboard players={state.players} highlightTop={16} finalStandings={finalStandings} rounds={state.rounds} tiers={tiers} />
               )}
             </motion.div>
           )}
@@ -600,7 +592,7 @@ export function Top8Page({
               animate={{ opacity: 1, height: "auto" }}
               className="mt-4"
             >
-              <LeaderStatsPanel rounds={state.rounds} />
+              <LeaderStatsPanel rounds={state.rounds} tiers={tiers} />
             </motion.div>
           )}
           {activePanel === "draftstats" && isColosseum && (
@@ -618,7 +610,7 @@ export function Top8Page({
               animate={{ opacity: 1, height: "auto" }}
               className="mt-4"
             >
-              <RoundHistory rounds={state.rounds} players={state.players} />
+              <RoundHistory rounds={state.rounds} players={state.players} context={state} />
             </motion.div>
           )}
         </div>
@@ -629,7 +621,8 @@ export function Top8Page({
         {!isColosseum && showLeaderReveal && currentRound?.availableLeaders && (
           <LeaderReveal
             leaders={currentRound.availableLeaders}
-            tier="C"
+            tier={currentRound.leaderTier ?? "C"}
+            color={state.tiers ? getTierColor(tiers, currentRound.leaderTier ?? "C") : undefined}
             onComplete={() => {
               setShowLeaderReveal(false);
               setLeaderRevealDone(true);

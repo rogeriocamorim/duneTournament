@@ -1,6 +1,8 @@
 import type { Player, Table, Round, TournamentState } from "./types";
 import type { LeaderStat, LeaderTier, LeaderInfo, StatsPhase } from "./types";
 import { LEADER_LIST, getLeaderInfo, getLeadersByTier } from "./types";
+import type { TierDef } from "./types";
+import { getCustomFinalStandings, pointsForPosition } from "./format";
 
 // ===== PLAYER MANAGEMENT =====
 
@@ -182,7 +184,7 @@ const MAX_BACKTRACK_ITERATIONS = 100_000;
  *
  * Player count MUST be divisible by 4 — all tables seat exactly 4.
  */
-function createGolfPods(
+export function createGolfPods(
   sortedIds: string[],
   playerMap: Map<string, Player>
 ): string[][] {
@@ -484,8 +486,9 @@ export function generateGrandFinal(redemptionRound: Round): Table {
 }
 
 // ===== SCORING =====
-
-const POINTS: Record<number, number> = { 1: 6, 2: 3, 3: 2, 4: 1 };
+//
+// Points per position come from the round (fixed when it was generated) and
+// any chess-clock penalty stored on the result is subtracted.
 
 export function applyResults(state: TournamentState, roundIndex: number): TournamentState {
   const newState = structuredClone(state);
@@ -498,7 +501,7 @@ export function applyResults(state: TournamentState, roundIndex: number): Tourna
       const player = newState.players.find((p) => p.id === result.playerId);
       if (!player) continue;
 
-      player.points += POINTS[result.position] || 0;
+      player.points += pointsForPosition(round, result.position) - (result.penaltyPoints ?? 0);
       player.totalVP += result.vp;
       player.efficiency += result.position;
       if (result.position === 1) player.wins++;
@@ -531,7 +534,7 @@ export function revertTableResults(state: TournamentState, roundIndex: number, t
     const player = newState.players.find((p) => p.id === result.playerId);
     if (!player) continue;
 
-    player.points -= POINTS[result.position] || 0;
+    player.points -= pointsForPosition(round, result.position) - (result.penaltyPoints ?? 0);
     player.totalVP -= result.vp;
     player.efficiency -= result.position;
     if (result.position === 1) player.wins--;
@@ -564,7 +567,7 @@ export function applyTableResults(state: TournamentState, roundIndex: number, ta
     const player = newState.players.find((p) => p.id === result.playerId);
     if (!player) continue;
 
-    player.points += POINTS[result.position] || 0;
+    player.points += pointsForPosition(round, result.position) - (result.penaltyPoints ?? 0);
     player.totalVP += result.vp;
     player.efficiency += result.position;
     if (result.position === 1) player.wins++;
@@ -650,7 +653,7 @@ export function getStandingsAsOfRound(
       for (const result of table.results) {
         const stat = statsMap.get(result.playerId);
         if (!stat) continue;
-        stat.points += POINTS[result.position] || 0;
+        stat.points += pointsForPosition(round, result.position) - (result.penaltyPoints ?? 0);
         stat.totalVP += result.vp;
         stat.efficiency += result.position;
         if (result.position === 1) stat.wins++;
@@ -684,6 +687,8 @@ export function getTop8(state: TournamentState): Player[] {
  * If Grand Final is not complete, falls back to cumulative standings.
  */
 export function getFinalStandings(state: TournamentState): Player[] {
+  if (state.mode === "custom") return getCustomFinalStandings(state);
+
   const grandFinal = state.rounds.find((r) => r.type === "grand-final");
 
   // If no completed grand final, just use normal standings
@@ -792,7 +797,8 @@ export function getFinalStandings(state: TournamentState): Player[] {
 export function getLeaderStats(
   rounds: Round[],
   fromRound?: number,
-  toRound?: number
+  toRound?: number,
+  tiers?: TierDef[],
 ): LeaderStat[] {
   const statsMap = new Map<string, { plays: number; wins: number; top2: number; totalVP: number; positionSum: number; roundsAvailable: number }>();
 
@@ -832,9 +838,10 @@ export function getLeaderStats(
   const leaderStats: LeaderStat[] = [];
   for (const [leader, stat] of statsMap) {
     const info = getLeaderInfo(leader);
+    const tournamentTier = info && tiers?.find((t) => t.leaderIds.includes(info.id))?.code;
     leaderStats.push({
       leader,
-      tier: info?.tier ?? "none",
+      tier: tiers ? tournamentTier ?? "none" : info?.tier ?? "none",
       plays: stat.plays,
       wins: stat.wins,
       top2: stat.top2,
@@ -854,7 +861,7 @@ export function getLeaderStats(
   return leaderStats;
 }
 
-const BRACKET_TYPES = new Set(["semifinal", "winners-final", "losers-final", "grand-final"]);
+const BRACKET_TYPES = new Set(["semifinal", "winners-final", "losers-final", "grand-final", "stage"]);
 
 /**
  * Compute leader stats filtered by tournament phase.
@@ -864,7 +871,8 @@ const BRACKET_TYPES = new Set(["semifinal", "winners-final", "losers-final", "gr
 export function getLeaderStatsByPhase(
   rounds: Round[],
   phase: StatsPhase,
-  singleRound?: number
+  singleRound?: number,
+  tiers?: TierDef[],
 ): LeaderStat[] {
   let filtered = rounds;
 
@@ -875,13 +883,17 @@ export function getLeaderStatsByPhase(
   }
 
   if (singleRound !== undefined) {
-    return getLeaderStats(filtered, singleRound, singleRound);
+    return getLeaderStats(filtered, singleRound, singleRound, tiers);
   }
 
-  return getLeaderStats(filtered);
+  return getLeaderStats(filtered, undefined, undefined, tiers);
 }
 
-// ===== LEADER TIER SELECTION =====
+// ===== LEADER TIER SELECTION (legacy A/B/C defaults) =====
+//
+// Rounds now draw leaders through the tournament format's tier rules
+// (format.ts → buildRoundLeaderFields). These helpers describe the original
+// built-in A/B/C behavior and are kept for old saves and tests.
 
 /**
  * Determine which leader tier to use for a given round.

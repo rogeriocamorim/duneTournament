@@ -1,8 +1,9 @@
 import { motion } from "motion/react";
 import { useState } from "react";
 import { ChevronUp, ChevronDown, Minus } from "lucide-react";
-import type { Player, Round } from "../engine/types";
+import type { Player, Round, TierDef } from "../engine/types";
 import { getStandings, getVpSharePct, getStandingsAsOfRound, getTierForRound } from "../engine/tournament";
+import { getPenaltyTotal, getTierColor } from "../engine/format";
 
 interface LeaderboardProps {
   players: Player[];
@@ -13,10 +14,17 @@ interface LeaderboardProps {
   rounds?: Round[];
   /** Pre-computed VP Share % values (keyed by player id). Used by spectator view. */
   vpSharePctMap?: Map<string, number>;
+  /** Tournament tiers (for round tier badge colors) */
+  tiers?: TierDef[];
+  /** Pre-computed clock penalty totals (keyed by player id). Used by spectator view. */
+  penaltyMap?: Map<string, number>;
 }
 
-export function Leaderboard({ players, highlightTop = 0, finalStandings, rounds = [], vpSharePctMap }: LeaderboardProps) {
+export function Leaderboard({ players, highlightTop = 0, finalStandings, rounds = [], vpSharePctMap, tiers, penaltyMap }: LeaderboardProps) {
   const completedRounds = rounds.filter((r) => r.isComplete);
+  const penaltyFor = (playerId: string) => penaltyMap?.get(playerId) ?? getPenaltyTotal(playerId, rounds);
+  const showPenalty = players.some((p) => penaltyFor(p.id) > 0);
+  const penaltyCol = showPenalty ? "_2.5rem" : "";
   const [selectedRound, setSelectedRound] = useState<number | null>(null);
 
   // Determine the standings to display
@@ -41,6 +49,7 @@ export function Leaderboard({ players, highlightTop = 0, finalStandings, rounds 
   }
 
   const hasPrevData = prevRoundPositionMap.size > 0;
+  const columns = leaderboardColumns(hasPrevData, penaltyCol);
 
   return (
     <div className="space-y-2">
@@ -60,9 +69,8 @@ export function Leaderboard({ players, highlightTop = 0, finalStandings, rounds 
           {completedRounds
             .sort((a, b) => a.number - b.number)
             .map((r) => {
-              const tier = r.leaderTier ?? getTierForRound(r.number, false);
-              const tierColors: Record<string, string> = { A: "#ef4444", B: "#c5a059", C: "#38bdf8" };
-              const tierColor = tierColors[tier] ?? "#c5a059";
+              const tier = r.leaderTier ?? (r.type === "qualifying" && !tiers ? getTierForRound(r.number, false) : "");
+              const tierColor = getTierColor(tiers, tier);
               return (
                 <div key={r.number} className="flex flex-col items-center gap-0.5">
                   <span
@@ -89,16 +97,14 @@ export function Leaderboard({ players, highlightTop = 0, finalStandings, rounds 
 
       {/* Header */}
       <div
-        className={`grid gap-1 px-4 py-2 text-xs uppercase tracking-[0.15em] opacity-50 ${
-          hasPrevData
-            ? "grid-cols-[2.5rem_3rem_1fr_3rem_2.5rem_3rem_3.5rem]"
-            : "grid-cols-[2.5rem_1fr_3rem_2.5rem_3rem_3.5rem]"
-        }`}
+        className="grid gap-1 px-4 py-2 text-xs uppercase tracking-[0.15em] opacity-50"
+        style={{ gridTemplateColumns: columns }}
       >
         <span>#</span>
         {hasPrevData && <span className="text-center">+/-</span>}
         <span>Player</span>
         <span className="text-right">Pts</span>
+        {showPenalty && <span className="text-right" title="Clock penalty points">Pen</span>}
         <span className="text-right">W</span>
         <span className="text-right">VP</span>
         <span className="text-right">VP%</span>
@@ -130,12 +136,9 @@ export function Leaderboard({ players, highlightTop = 0, finalStandings, rounds 
               layout: { type: "spring", stiffness: 300, damping: 30 },
               opacity: { duration: 0.3, delay: index * 0.03 },
             }}
+            style={{ gridTemplateColumns: columns }}
             className={`
               grid gap-1 px-4 py-3 rounded-sm
-              ${hasPrevData
-                ? "grid-cols-[2.5rem_3rem_1fr_3rem_2.5rem_3rem_3.5rem]"
-                : "grid-cols-[2.5rem_1fr_3rem_2.5rem_3rem_3.5rem]"
-              }
               ${isTopCut ? "stone-card spice-glow" : "glass-morphism"}
               ${rank === 1 ? "border-l-4 border-l-[#FFD700]" : ""}
               ${rank === 2 ? "border-l-4 border-l-[#C0C0C0]" : ""}
@@ -177,6 +180,11 @@ export function Leaderboard({ players, highlightTop = 0, finalStandings, rounds 
             <span className="text-score text-right text-spice text-lg">
               {player.points}
             </span>
+            {showPenalty && (
+              <span className="text-score text-right text-sm text-blood self-center">
+                {penaltyFor(player.id) > 0 ? `−${penaltyFor(player.id)}` : ""}
+              </span>
+            )}
             <span className="text-score text-right text-sm text-fremen-blue">
               {player.wins}
             </span>
@@ -191,4 +199,14 @@ export function Leaderboard({ players, highlightTop = 0, finalStandings, rounds 
       })}
     </div>
   );
+}
+
+/** CSS grid columns: rank, [delta], player, pts, [penalty], wins, VP, VP% */
+function leaderboardColumns(hasPrevData: boolean, penaltyCol: string): string {
+  const cols = ["2.5rem"];
+  if (hasPrevData) cols.push("3rem");
+  cols.push("1fr", "3rem");
+  if (penaltyCol) cols.push("2.5rem");
+  cols.push("2.5rem", "3rem", "3.5rem");
+  return cols.join(" ");
 }

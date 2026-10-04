@@ -1,6 +1,6 @@
 // ===== CORE TYPES =====
 
-export type TournamentMode = "classic" | "colosseum";
+export type TournamentMode = "classic" | "colosseum" | "custom";
 
 export interface Player {
   id: string;
@@ -20,6 +20,8 @@ export interface TableResult {
   leader?: string;        // leader picked for this game
   seatPosition?: number;  // Colosseum mode: seat at table
   pickOrder?: number;     // Colosseum mode: leader pick order
+  minutesUsed?: number;   // Chess clock: minutes this player used in the game
+  penaltyPoints?: number; // Chess clock: tournament points deducted for overtime
 }
 
 export interface Table {
@@ -35,9 +37,13 @@ export interface Round {
   number: number;
   tables: Table[];
   isComplete: boolean;
-  type: "qualifying" | "semifinal" | "winners-final" | "losers-final" | "grand-final";
+  type: "qualifying" | "semifinal" | "winners-final" | "losers-final" | "grand-final" | "stage";
   availableLeaders?: string[]; // leader names available for this round
-  leaderTier?: LeaderTier;     // tier used for leader selection this round
+  leaderTier?: LeaderTier;     // tier label used for leader selection this round (e.g. "A" or "S+A")
+  tierCodes?: string[];        // tier codes the leader pool was drawn from
+  placementPoints?: number[];  // tournament points for 1st..4th, fixed when the round is generated
+  stageIndex?: number;         // index into format.stages (custom mode)
+  roundInStage?: number;       // 1-based round number within its stage (custom mode)
 }
 
 export interface TournamentState {
@@ -59,6 +65,98 @@ export interface TournamentState {
     dramaticReveal: boolean;
     testMode: boolean;
   };
+  /** Tournament structure, scoring, clock and per-stage tier rules */
+  format?: TournamentFormat;
+  /** Leader tiers for this tournament (copied from a preset, then editable) */
+  tiers?: TierDef[];
+  /** Custom mode: index of the stage being played */
+  currentStage?: number;
+  /** Custom mode: player ids entering each stage, in seed order */
+  stageEntrants?: string[][];
+}
+
+// ===== TOURNAMENT FORMAT =====
+
+/** How players are distributed onto tables of 4 */
+export type PairingMethod =
+  | "swiss-golf"    // rank by standings, snake across tables, avoid rematches
+  | "random"        // random tables, avoid rematches where possible
+  | "seeded-snake"  // rank by standings, snake across tables (1,8,9,16 / 2,7,10,15 ...)
+  | "seeded-block"  // rank by standings, top 4 together, next 4 together ...
+  | "groups-fixed"  // fixed groups of 8 with the Colosseum schedule
+  | "manual";       // organizer assigns every table
+
+/** Which kind of stage this is */
+export type StageKind =
+  | "rounds"             // generic stage: N rounds with a pairing method
+  | "classic-bracket"    // Top 16 semifinal → redemption → grand final
+  | "colosseum-bracket"; // Colosseum knockout draw → semifinal 2 → grand final
+
+/** Who enters a stage (ignored for the first stage, which takes every registered player) */
+export interface Advancement {
+  kind: "all" | "top-n" | "table-winners";
+  /** top-n: number of players that advance */
+  n?: number;
+  /** table-winners: best N of every table in the previous stage's last round */
+  perTable?: number;
+}
+
+/** Which tiers supply the leader pool for a round */
+export interface TierRule {
+  /** 1-based round within the stage; omit to apply to every round without its own rule */
+  roundInStage?: number;
+  tierCodes: string[];
+  /** "all" = every leader of the tiers, "random-n" = draw poolSize leaders */
+  selection: "all" | "random-n";
+  poolSize?: number;
+  /** Pick ONE of tierCodes at random instead of combining them */
+  randomOneOf?: boolean;
+}
+
+export interface StageConfig {
+  id: string;
+  name: string;
+  kind: StageKind;
+  rounds: number;
+  advancement: Advancement;
+  pairing: PairingMethod;
+  /** Tournament points for 1st..4th in this stage (falls back to the format default) */
+  placementPoints?: number[];
+  /** true = stage ranking uses all points so far, false = only points scored in this stage */
+  carryPoints: boolean;
+  /** Use the chess clock in this stage (default true when the clock is enabled) */
+  clockEnabled?: boolean;
+  /** Override of the clock budget for this stage */
+  clockBudgetMinutes?: number | null;
+  tierRules: TierRule[];
+}
+
+export interface ClockConfig {
+  enabled: boolean;
+  /** Minutes each player may use per game */
+  budgetMinutes: number;
+  /** Tournament points lost per minute over budget */
+  penaltyPerMinute: number;
+  /** Maximum penalty per game (null = no cap) */
+  penaltyCap: number | null;
+  /** started-minute: 30.5 min over a 30 budget = 1 minute; full-minute: = 0 minutes */
+  rounding: "started-minute" | "full-minute";
+}
+
+export interface TournamentFormat {
+  templateId: string;
+  /** Default tournament points for 1st..4th */
+  placementPoints: number[];
+  clock: ClockConfig;
+  stages: StageConfig[];
+}
+
+export interface TierDef {
+  code: string;
+  label: string;
+  color: string;
+  /** Leader ids (LeaderInfo.id) in this tier */
+  leaderIds: string[];
 }
 
 export const POINTS_MAP: Record<number, number> = {
@@ -89,7 +187,8 @@ export const DEFAULT_STATE: TournamentState = {
 
 // ===== LEADERS (Base + Ix + Uprising + Bloodlines) =====
 
-export type LeaderTier = "A" | "B" | "C" | "none";
+/** Tier code ("A", "S", ...) or a combined label such as "S+A"; "none" = untiered */
+export type LeaderTier = string;
 
 export interface LeaderInfo {
   id: string;
@@ -137,7 +236,22 @@ export const LEADER_LIST: LeaderInfo[] = [
   { id: "bl_Piter",          name: "Piter De Vries",                 tier: "none", expansion: "bloodlines", imageSlug: "bloodlines-leader-piter-de-vries" },
   { id: "bl_Piter_com",      name: "Piter De Vries (Community)",     tier: "A",    expansion: "bloodlines", imageSlug: "bloodlines-leader-piter-de-vries", isCommunity: true },
   { id: "bl_Yrkoon",         name: "Steersman Y'rkoon",              tier: "B",    expansion: "bloodlines", imageSlug: "bloodlines-leader-steersman-y-rkoon" },
+  // ── Community leaders (TTS mod) ──
+  { id: "rhomburVernius_com", name: "Prince Rhombur Vernius (Community)", tier: "none", expansion: "ix",     imageSlug: "rise-of-ix-leader-prince-rhombur-vernius", isCommunity: true },
+  { id: "arianaThorvald_com", name: "Ariana Thorvald (Community)",    tier: "none", expansion: "base",       imageSlug: "dune-imperium-leader-countess-ariana-thorvald", isCommunity: true },
+  { id: "paulAtreides_com",  name: "Paul Atreides (Community)",       tier: "none", expansion: "base",       imageSlug: "dune-imperium-leader-paul-atreides", isCommunity: true },
 ];
+
+/** TTS mod leader ids that map to a different id here */
+export const LEADER_ID_ALIASES: Record<string, string> = {
+  bl_Liet_com: "liet_com",
+};
+
+/** Lookup leader info by id (TTS ids accepted) */
+export function getLeaderById(id: string): LeaderInfo | undefined {
+  const resolved = LEADER_ID_ALIASES[id] ?? id;
+  return LEADER_LIST.find((l) => l.id === resolved);
+}
 
 /** Flat list of leader display names (for dropdowns) */
 export const LEADERS: string[] = LEADER_LIST.map((l) => l.name);
@@ -147,8 +261,13 @@ export function getLeaderInfo(name: string): LeaderInfo | undefined {
   return LEADER_LIST.find((l) => l.name === name);
 }
 
-/** Get leaders filtered by tier */
-export function getLeadersByTier(tier: LeaderTier): LeaderInfo[] {
+/** Get leaders filtered by tier. Uses the tournament tiers when given, else the built-in A/B/C tiers. */
+export function getLeadersByTier(tier: LeaderTier, tiers?: TierDef[]): LeaderInfo[] {
+  if (tiers) {
+    const codes = tier.split("+");
+    const ids = new Set(tiers.filter((t) => codes.includes(t.code)).flatMap((t) => t.leaderIds));
+    return LEADER_LIST.filter((l) => ids.has(l.id));
+  }
   return LEADER_LIST.filter((l) => l.tier === tier);
 }
 

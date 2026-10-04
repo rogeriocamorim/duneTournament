@@ -1,31 +1,9 @@
 // ===== GITHUB GIST SERVICE =====
 // Handles creation and fetching of tournament standings via GitHub Gist API
 
-import type { Round, Player, TournamentMode } from "../engine/types";
+import type { StandingsSnapshot } from "../engine/snapshot";
 
-export interface StandingsSnapshot {
-  metadata: {
-    tournamentName: string;
-    timestamp: string;
-    currentRound: number;
-    totalRounds: number;
-    phase: string;
-    mode?: TournamentMode;
-  };
-  standings: {
-    rank: number;
-    name: string;
-    points: number;
-    wins: number;
-    totalVP: number;
-    vpSharePct: number;
-    efficiency: number;
-  }[];
-  /** Full round data — enables tables, leader stats, seats in spectator view */
-  rounds?: Round[];
-  /** Full player data — enables group standings in spectator view */
-  players?: Player[];
-}
+export type { StandingsSnapshot };
 
 /**
  * Creates an anonymous public GitHub Gist with standings data.

@@ -1,8 +1,9 @@
 import { motion, AnimatePresence } from "motion/react";
 import { useState, useEffect } from "react";
-import type { Table, TableResult, Player, TournamentMode, LeaderTier } from "../engine/types";
+import type { Table, TableResult, Player, TournamentMode, LeaderTier, TierDef, ClockConfig } from "../engine/types";
 import { LEADER_LIST, getLeadersByTier } from "../engine/types";
-import { Pencil, AlertTriangle } from "lucide-react";
+import { DEFAULT_PLACEMENT_POINTS, computeClockPenalty } from "../engine/format";
+import { Pencil, AlertTriangle, Timer } from "lucide-react";
 
 interface TableCardProps {
   table: Table;
@@ -14,6 +15,12 @@ interface TableCardProps {
   availableLeaders?: string[];
   leaderTier?: LeaderTier;
   mode?: TournamentMode;
+  /** Tournament tiers (for Colosseum tier leader lists) */
+  tiers?: TierDef[];
+  /** Tournament points for 1st..4th in this round */
+  placementPoints?: number[];
+  /** Chess clock for this round (null/undefined = no clock) */
+  clock?: ClockConfig | null;
 }
 
 /** Local state shape for each player's result entry */
@@ -23,6 +30,8 @@ interface LocalResult {
   leader: string;
   seatPosition: number;
   pickOrder: number;
+  /** Minutes used on the chess clock, as typed ("" = not entered) */
+  minutes: string;
 }
 
 /** Ordinal suffix for position numbers (1st, 2nd, 3rd, 4th) */
@@ -58,13 +67,16 @@ export function TableCard({
   availableLeaders,
   leaderTier,
   mode = "classic",
+  tiers,
+  placementPoints = DEFAULT_PLACEMENT_POINTS,
+  clock,
 }: TableCardProps) {
   const isColosseum = mode === "colosseum";
 
   // In Colosseum mode, show all leaders from the round's tier (online game picks randomly)
-  // In Classic mode, use the specific availableLeaders subset
+  // In other modes, use the specific availableLeaders subset
   const leaderOptions: string[] | undefined = isColosseum && leaderTier
-    ? getLeadersByTier(leaderTier).map((l) => l.name)
+    ? getLeadersByTier(leaderTier, tiers).map((l) => l.name)
     : availableLeaders;
   const [editing, setEditing] = useState(allowEdit && !table.isComplete);
   const [results, setResults] = useState<Record<string, LocalResult>>(
@@ -78,13 +90,14 @@ export function TableCard({
             leader: r.leader || "",
             seatPosition: r.seatPosition || 0,
             pickOrder: r.pickOrder || 0,
+            minutes: r.minutesUsed !== undefined ? String(r.minutesUsed) : "",
           };
         }
         return map;
       }
       const map: Record<string, LocalResult> = {};
       for (const id of table.playerIds) {
-        map[id] = { position: 0, vp: 0, leader: "", seatPosition: 0, pickOrder: 0 };
+        map[id] = { position: 0, vp: 0, leader: "", seatPosition: 0, pickOrder: 0, minutes: "" };
       }
       return map;
     }
@@ -108,6 +121,7 @@ export function TableCard({
           leader: r.leader || "",
           seatPosition: r.seatPosition || 0,
           pickOrder: r.pickOrder || 0,
+          minutes: r.minutesUsed !== undefined ? String(r.minutesUsed) : "",
         };
       }
       setResults(map);
@@ -152,12 +166,19 @@ export function TableCard({
     }));
   };
 
-  const handlePickOrderChange = (playerId: string, pickOrder: number) => {
+  const handleMinutesChange = (playerId: string, minutes: string) => {
     setError(null);
     setResults((prev) => ({
       ...prev,
-      [playerId]: { ...prev[playerId], pickOrder },
+      [playerId]: { ...prev[playerId], minutes },
     }));
+  };
+
+  /** Parsed minutes for a player (undefined when not entered) */
+  const parseMinutes = (value: string): number | undefined => {
+    if (value.trim() === "") return undefined;
+    const n = Number(value.replace(",", "."));
+    return Number.isFinite(n) ? n : undefined;
   };
 
   const handleSubmit = () => {
@@ -208,10 +229,9 @@ export function TableCard({
       }
     }
 
-    // Colosseum-only: validate seat positions and pick orders
+    // Colosseum-only: validate seat positions
     if (isColosseum) {
       const seatPositions = entries.map(([, r]) => r.seatPosition);
-      const pickOrders = entries.map(([, r]) => r.pickOrder);
 
       if (seatPositions.some((s) => s === 0)) {
         setError("All seat positions must be set.");
@@ -221,25 +241,29 @@ export function TableCard({
         setError("Seat positions must be unique.");
         return;
       }
-      if (pickOrders.some((p) => p === 0)) {
-        setError("All pick orders must be set.");
-        return;
-      }
-      if (new Set(pickOrders).size !== pickOrders.length) {
-        setError("Pick orders must be unique.");
-        return;
+    }
+
+    // Chess clock: minutes must be valid numbers when entered
+    if (clock) {
+      for (const [playerId, r] of entries) {
+        if (r.minutes.trim() !== "" && (parseMinutes(r.minutes) === undefined || parseMinutes(r.minutes)! < 0)) {
+          const name = tablePlayers.find((p) => p.id === playerId)?.name ?? playerId;
+          setError(`Minutes used for ${name} must be a positive number.`);
+          return;
+        }
       }
     }
 
     setError(null);
     const tableResults: TableResult[] = entries.map(
-      ([playerId, { position, vp, leader, seatPosition, pickOrder }]) => ({
+      ([playerId, { position, vp, leader, seatPosition, pickOrder, minutes }]) => ({
         playerId,
         position,
         vp,
         leader: leader || undefined,
         seatPosition: isColosseum ? seatPosition : undefined,
-        pickOrder: isColosseum ? pickOrder : undefined,
+        pickOrder: isColosseum && pickOrder ? pickOrder : undefined,
+        minutesUsed: clock ? parseMinutes(minutes) : undefined,
       })
     );
 
@@ -365,12 +389,49 @@ export function TableCard({
                   </span>
                 )}
 
-                {/* Points display */}
-                {!editing && result?.position && (
-                  <span className="text-score text-spice text-sm w-12 text-right">
-                    +{[6, 3, 2, 1][result.position - 1] || 0}
+                {/* Chess clock: minutes used */}
+                {clock && editing && (
+                  <span className="flex items-center gap-1" title={`Clock budget: ${clock.budgetMinutes} min`}>
+                    <Timer size={12} className="text-fremen-blue" />
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.1"
+                      value={result?.minutes ?? ""}
+                      onChange={(e) => handleMinutesChange(player.id, e.target.value)}
+                      placeholder="min"
+                      aria-label={`Minutes used by ${player.name}`}
+                      className="bg-black/50 border border-fremen-blue/30 text-score text-sm px-2 py-1 rounded-sm w-16 text-center text-white"
+                    />
                   </span>
                 )}
+                {clock && !editing && result?.minutes && (
+                  <span className="text-xs text-fremen-blue/80 w-14 text-center" title="Minutes used">
+                    {result.minutes}&prime;
+                  </span>
+                )}
+
+                {/* Points display */}
+                {!editing && result?.position ? (() => {
+                  const penalty = table.results.find((r) => r.playerId === player.id)?.penaltyPoints ?? 0;
+                  const earned = placementPoints[result.position - 1] ?? 0;
+                  return (
+                    <span className="text-score text-spice text-sm w-16 text-right" title={penalty ? `${earned} points − ${penalty} clock penalty` : undefined}>
+                      {earned - penalty >= 0 ? "+" : "\u2212"}{Math.abs(earned - penalty)}
+                      {penalty > 0 && <span className="text-blood text-[10px] ml-0.5">(−{penalty})</span>}
+                    </span>
+                  );
+                })() : null}
+
+                {/* Live penalty preview while editing */}
+                {editing && clock && (() => {
+                  const preview = computeClockPenalty(parseMinutes(result?.minutes ?? ""), clock);
+                  return preview > 0 ? (
+                    <span className="text-[10px] text-blood uppercase tracking-wider" title="Clock penalty">
+                      −{preview} pts
+                    </span>
+                  ) : null;
+                })()}
               </div>
 
               {/* Line 2: Seat + Leader (Colosseum editing only) */}

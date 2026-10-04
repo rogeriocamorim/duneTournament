@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Users, Play, FlaskConical } from "lucide-react";
+import { X, Users, Play, FlaskConical, Settings, AlertTriangle } from "lucide-react";
 import { SandwormRegistration } from "../components/animations/SandwormRegistration";
 import { generateTestPlayerNames } from "../engine/testUtils";
-import type { Player, TournamentMode } from "../engine/types";
+import type { Player, TournamentFormat, TournamentMode } from "../engine/types";
+import { projectStages, validateFormat } from "../engine/format";
 
 const INTRO_VIDEO_EMBED_URL =
   "https://www.canva.com/design/DAHCwjWwmKc/IU6i6iu-jQcoAxraRjjjPg/view?embed";
@@ -11,7 +12,10 @@ const INTRO_VIDEO_EMBED_URL =
 interface RegistrationPageProps {
   players: Player[];
   onAddPlayer: (name: string) => void;
+  onAddPlayers: (names: string[]) => void;
   onRemovePlayer: (id: string) => void;
+  onOpenSettings: () => void;
+  format?: TournamentFormat;
   onStart: () => void;
   testMode: boolean;
   mode: TournamentMode;
@@ -20,13 +24,21 @@ interface RegistrationPageProps {
 export function RegistrationPage({
   players,
   onAddPlayer,
+  onAddPlayers,
   onRemovePlayer,
+  onOpenSettings,
+  format,
   onStart,
   testMode,
   mode,
 }: RegistrationPageProps) {
   const isColosseum = mode === "colosseum";
-  const canStart = isColosseum
+  const isCustom = mode === "custom";
+  const formatErrors = isCustom && format ? validateFormat(format, players.length, "custom") : [];
+  const projections = isCustom && format ? projectStages(format, players.length) : [];
+  const canStart = isCustom
+    ? formatErrors.length === 0
+    : isColosseum
     ? players.length >= 16 && players.length % 8 === 0
     : players.length >= 4 && players.length % 4 === 0;
   const [showVideo, setShowVideo] = useState(false);
@@ -40,10 +52,7 @@ export function RegistrationPage({
   const handleAutoFillPlayers = () => {
     const count = Math.min(100, Math.max(4, parseInt(testPlayerCountInput) || 4));
     setTestPlayerCountInput(String(count));
-    const names = generateTestPlayerNames(count);
-    for (const name of names) {
-      onAddPlayer(name);
-    }
+    onAddPlayers(generateTestPlayerNames(count));
   };
 
   return (
@@ -99,13 +108,20 @@ export function RegistrationPage({
         </p>
       </motion.div>
 
-      {/* Play Video Button */}
+      {/* Play Video + Settings Buttons */}
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.3 }}
-        className="flex justify-center mb-8"
+        className="flex justify-center gap-3 mb-8"
       >
+        <button
+          onClick={onOpenSettings}
+          className="btn-imperial flex items-center gap-2 px-6 py-2 text-sm uppercase tracking-widest"
+        >
+          <Settings size={16} />
+          Format &amp; Tiers
+        </button>
         <button
           onClick={() => setShowVideo(true)}
           className="btn-imperial flex items-center gap-2 px-6 py-2 text-sm uppercase tracking-widest"
@@ -195,6 +211,26 @@ export function RegistrationPage({
         </motion.div>
       )}
 
+      {/* Custom format overview */}
+      {isCustom && format && players.length > 0 && (
+        <div className="mb-6 glass-morphism rounded-sm p-4 text-xs space-y-1">
+          {format.stages.map((stage, i) => {
+            const p = projections[i];
+            return (
+              <p key={stage.id} className={p?.errors.length ? "text-blood" : "text-sand-dark"}>
+                <span className="text-sand">{stage.name}</span>
+                {p && !p.errors.length && ` — ${p.players} players, ${p.tables} table${p.tables === 1 ? "" : "s"}, ${stage.rounds} round${stage.rounds === 1 ? "" : "s"}`}
+                {p?.errors.length ? (
+                  <span className="inline-flex items-center gap-1 ml-1">
+                    <AlertTriangle size={11} /> {p.errors.join(" ")}
+                  </span>
+                ) : null}
+              </p>
+            );
+          })}
+        </div>
+      )}
+
       {/* Start Button */}
       {canStart && (
         <motion.div
@@ -213,12 +249,13 @@ export function RegistrationPage({
             {isColosseum
               ? `${players.length / 8} group${players.length / 8 > 1 ? "s" : ""} of 8`
               : `${players.length / 4} table${players.length / 4 > 1 ? "s" : ""} of 4`}
+            {isCustom && format && ` · ${format.stages.length} stage${format.stages.length > 1 ? "s" : ""}`}
           </p>
         </motion.div>
       )}
 
       {/* Hint when player count doesn't meet mode requirements */}
-      {players.length > 0 && !canStart && (
+      {players.length > 0 && !canStart && !isCustom && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

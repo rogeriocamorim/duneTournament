@@ -74,9 +74,10 @@ async function waitForModeSelector(page: Page) {
   await expect(page.getByRole("heading", { name: "Colosseum" })).toBeVisible();
 }
 
-/** Select a tournament mode */
+/** Select a tournament format template and create the tournament */
 async function selectMode(page: Page, mode: "Classic" | "Colosseum") {
-  await page.getByRole("button", { name: mode }).click();
+  await page.getByRole("heading", { name: mode, exact: true }).click();
+  await page.getByRole("button", { name: `Create ${mode} Tournament` }).click();
 }
 
 /** Type a player name into the registration form and submit */
@@ -138,16 +139,21 @@ test.describe("Mode Selector Page", () => {
 
   test("Classic card shows correct description", async ({ page }) => {
     await waitForModeSelector(page);
-    await expect(page.getByText("Swiss Pairing")).toBeVisible();
-    await expect(page.getByText("5 qualifying rounds")).toBeVisible();
-    await expect(page.getByText("Minimum 4 players")).toBeVisible();
+    await expect(page.getByText("Swiss qualifying rounds, then the Top 16 double-chance bracket.")).toBeVisible();
+    await expect(page.getByText("— 5 rounds", { exact: false }).first()).toBeVisible();
+    await expect(page.getByText("Top 16 Bracket")).toBeVisible();
   });
 
   test("Colosseum card shows correct description", async ({ page }) => {
     await waitForModeSelector(page);
     await expect(page.getByText("Group Stage")).toBeVisible();
-    await expect(page.getByText("4 pre-generated qualifying rounds")).toBeVisible();
-    await expect(page.getByText("Minimum 16 players")).toBeVisible();
+    await expect(page.getByText("Groups of 8 with a fixed 4-round schedule, then the knockout bracket.")).toBeVisible();
+  });
+
+  test("custom templates are offered", async ({ page }) => {
+    await waitForModeSelector(page);
+    await expect(page.getByRole("heading", { name: "Swiss + Top 8", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Swiss + Final Table", exact: true })).toBeVisible();
   });
 
   test("selecting Classic goes to registration page", async ({ page }) => {

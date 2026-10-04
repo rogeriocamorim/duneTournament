@@ -6,39 +6,57 @@ import { GroupStandings } from "../components/GroupStandings";
 import { RoundHistory } from "../components/RoundHistory";
 import { TableCard } from "../components/TableCard";
 import { fetchStandingsBin } from "../utils/jsonbinService";
+import { getPublicSnapshot } from "../api/client";
 import { getTierForRound } from "../engine/tournament";
-import { getLeaderInfo, getLeaderImageUrl } from "../engine/types";
+import { getRoundStageName, getTableCardRoundProps, getTierColor } from "../engine/format";
+import type { FormatContext } from "../engine/format";
+import { getLeaderInfo } from "../engine/types";
+import { LeaderImage } from "../components/LeaderImage";
 import type { StandingsSnapshot } from "../utils/gistService";
 import type { Player, Round } from "../engine/types";
 
 interface SpectatorPageProps {
-  pasteId: string; // JSONBin ID (e.g., "6993da5aae596e708f30912e")
+  /** JSONBin ID (e.g., "6993da5aae596e708f30912e") — legacy share links */
+  pasteId?: string;
+  /** Share slug of a tournament stored on the server (live view) */
+  liveSlug?: string;
 }
+
+/** Live view refresh interval */
+const LIVE_REFRESH_MS = 15_000;
 
 type LoadingState = "loading" | "success" | "error";
 type SpectatorTab = "tables" | "groups" | "standings" | "leaders" | "seats" | "history";
 
-export function SpectatorPage({ pasteId }: SpectatorPageProps) {
+export function SpectatorPage({ pasteId, liveSlug }: SpectatorPageProps) {
   const [state, setState] = useState<LoadingState>("loading");
   const [snapshot, setSnapshot] = useState<StandingsSnapshot | null>(null);
   const [error, setError] = useState<string>("");
   const [activeTab, setActiveTab] = useState<SpectatorTab>("standings");
   const [displayRoundIndex, setDisplayRoundIndex] = useState(0);
 
-  const loadStandings = async () => {
-    setState("loading");
-    setError("");
+  const loadStandings = async (silent = false) => {
+    if (!silent) {
+      setState("loading");
+      setError("");
+    }
 
     try {
-      const standingsData = await fetchStandingsBin(pasteId);
+      const standingsData = liveSlug
+        ? await getPublicSnapshot(liveSlug)
+        : await fetchStandingsBin(pasteId ?? "");
       setSnapshot(standingsData);
       setState("success");
 
       // Default to the latest round for table view
-      if (standingsData.rounds && standingsData.rounds.length > 0) {
-        setDisplayRoundIndex(standingsData.rounds.filter((r) => r.type === "qualifying").length - 1);
+      if (!silent && standingsData.rounds && standingsData.rounds.length > 0) {
+        const navRounds = standingsData.metadata.mode === "custom"
+          ? standingsData.rounds
+          : standingsData.rounds.filter((r) => r.type === "qualifying");
+        setDisplayRoundIndex(navRounds.length - 1);
       }
     } catch (err) {
+      if (silent) return;
       console.error("Failed to load standings:", err);
       setError(
         err instanceof Error
@@ -51,7 +69,10 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
 
   useEffect(() => {
     loadStandings();
-  }, [pasteId]);
+    if (!liveSlug) return;
+    const timer = setInterval(() => loadStandings(true), LIVE_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [pasteId, liveSlug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Convert snapshot standings to Player format for Leaderboard component
   const standingsPlayers: Player[] = snapshot
@@ -68,9 +89,11 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
 
   // Build pre-computed VP Share % map from snapshot
   const vpSharePctMap = new Map<string, number>();
+  const penaltyMap = new Map<string, number>();
   if (snapshot) {
     for (const s of snapshot.standings) {
       vpSharePctMap.set(s.name, s.vpSharePct ?? 0);
+      penaltyMap.set(s.name, s.penaltyPoints ?? 0);
     }
   }
 
@@ -79,9 +102,15 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
   const players: Player[] = snapshot?.players ?? [];
   const hasFullData = rounds.length > 0 && players.length > 0;
   const isColosseum = snapshot?.metadata.mode === "colosseum";
+  const isCustom = snapshot?.metadata.mode === "custom";
+  const context: FormatContext = {
+    mode: snapshot?.metadata.mode ?? "classic",
+    format: snapshot?.format,
+    tiers: snapshot?.tiers,
+  };
 
-  // Qualifying rounds for the tables tab
-  const qualifyingRounds = rounds.filter((r) => r.type === "qualifying");
+  // Rounds for the tables tab (custom mode shows every stage)
+  const qualifyingRounds = isCustom ? rounds : rounds.filter((r) => r.type === "qualifying");
   const currentRound = qualifyingRounds[displayRoundIndex] ?? null;
   const completedRounds = rounds.filter((r) => r.isComplete);
 
@@ -116,7 +145,7 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
           </h2>
           <p className="text-sm text-sand-dark mb-6">{error}</p>
           <button
-            onClick={loadStandings}
+            onClick={() => loadStandings()}
             className="btn-imperial-filled py-2 px-6 inline-flex items-center gap-2"
           >
             <RefreshCw size={16} />
@@ -207,9 +236,8 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
                   const isActive = idx === displayRoundIndex;
                   const isComplete = round.isComplete;
                   const inProgress = !isComplete && round.tables.some((t) => t.isComplete);
-                  const tier = round.leaderTier ?? getTierForRound(round.number, false);
-                  const tierColors: Record<string, string> = { A: "#ef4444", B: "#c5a059", C: "#38bdf8" };
-                  const tierColor = tierColors[tier] ?? "#c5a059";
+                  const tier = round.leaderTier ?? (snapshot.tiers ? "" : getTierForRound(round.number, false));
+                  const tierColor = getTierColor(snapshot.tiers, tier);
                   return (
                     <div key={round.number} className="flex flex-col items-center gap-1">
                       <span
@@ -244,16 +272,7 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
             {currentRound && (
               <div>
                 <h2 className="text-display text-sm text-sand-dark mb-4 text-center">
-                  Round {currentRound.number} &mdash;{" "}
-                  {currentRound.type === "qualifying"
-                    ? "Qualifying"
-                    : currentRound.type === "semifinal"
-                    ? "Semifinal"
-                    : currentRound.type === "winners-final"
-                    ? "Winners & Losers Finals"
-                    : currentRound.type === "grand-final"
-                    ? "Grand Final"
-                    : currentRound.type}
+                  Round {currentRound.number} &mdash; {getRoundStageName(context, currentRound)}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {currentRound.tables.map((table, index) => (
@@ -265,9 +284,7 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
                       onSubmitResults={() => {}}
                       animationDelay={index}
                       allowEdit={false}
-                      availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
-                      leaderTier={isColosseum ? undefined : currentRound.leaderTier}
-                      mode={snapshot.metadata.mode}
+                      {...getTableCardRoundProps(context, currentRound)}
                     />
                   ))}
                 </div>
@@ -293,11 +310,7 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
                               className="relative rounded-md overflow-hidden border border-spice/30"
                               style={{ boxShadow: "0 0 12px rgba(197, 160, 89, 0.15)" }}
                             >
-                              <img
-                                src={getLeaderImageUrl(info)}
-                                alt={info.name}
-                                className="w-24 md:w-32 h-auto block"
-                              />
+                              <LeaderImage leader={info} className="w-24 md:w-32 h-auto block" />
                               {info.isCommunity && (
                                 <div className="absolute top-1 right-1 bg-fremen-blue/90 text-obsidian text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded-sm leading-tight">
                                   Community
@@ -329,9 +342,16 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
         {activeTab === "standings" && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             {hasFullData ? (
-              <Leaderboard players={players} rounds={rounds} />
+              <Leaderboard
+                players={players}
+                rounds={rounds}
+                tiers={snapshot.tiers}
+                finalStandings={snapshot.metadata.phase === "finished"
+                  ? snapshot.standings.map((s) => players.find((p) => p.name === s.name)).filter((p): p is Player => !!p)
+                  : undefined}
+              />
             ) : (
-              <Leaderboard players={standingsPlayers} vpSharePctMap={vpSharePctMap} />
+              <Leaderboard players={standingsPlayers} vpSharePctMap={vpSharePctMap} penaltyMap={penaltyMap} />
             )}
           </motion.div>
         )}
@@ -339,7 +359,7 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
         {/* ---- History Tab ---- */}
         {activeTab === "history" && hasFullData && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <RoundHistory rounds={rounds} players={players} />
+            <RoundHistory rounds={rounds} players={players} context={context} />
           </motion.div>
         )}
 
@@ -351,7 +371,7 @@ export function SpectatorPage({ pasteId }: SpectatorPageProps) {
           className="text-center mt-8"
         >
           <p className="text-xs text-sand-dark uppercase tracking-widest opacity-50">
-            Refresh your browser to see the latest data
+            {liveSlug ? "Live — updates automatically" : "Refresh your browser to see the latest data"}
           </p>
         </motion.div>
       </div>

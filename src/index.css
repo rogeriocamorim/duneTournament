@@ -234,6 +234,25 @@ body::before {
   box-shadow: 0 2px 10px var(--color-fremen-glow);
 }
 
+/* Compact form field for settings dialogs */
+.field-imperial {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(197, 160, 89, 0.3);
+  border-radius: 2px;
+  color: var(--color-sand);
+  padding: 0.25rem 0.5rem;
+  outline: none;
+  min-width: 0;
+}
+
+.field-imperial:focus {
+  border-color: var(--color-fremen-blue);
+}
+
+.field-imperial:disabled {
+  opacity: 0.5;
+}
+
 .input-imperial::placeholder {
   color: var(--color-sand-dark);
   text-transform: uppercase;
