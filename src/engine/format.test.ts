@@ -310,7 +310,7 @@ describe("custom format: Swiss + Top 8", () => {
 
 describe("custom placement points and clock penalties", () => {
   function startedWith(points: number[], clock: ClockConfig | null): TournamentState {
-    let state = customTournament("swiss-top4", 4);
+    const state = customTournament("swiss-top4", 4);
     const format = structuredClone(state.format!);
     format.placementPoints = points;
     if (clock) format.clock = clock;

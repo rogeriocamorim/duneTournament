@@ -5,6 +5,13 @@ interface SandstormTransitionProps {
   onComplete?: () => void;
 }
 
+/** Random look of the 8 sand streaks, fixed once so rendering stays pure */
+const STREAKS = Array.from({ length: 8 }, () => ({
+  opacity: 0.1 + Math.random() * 0.2,
+  height: 1 + Math.random() * 3,
+  duration: 0.4 + Math.random() * 0.3,
+}));
+
 export function SandstormTransition({ show, onComplete }: SandstormTransitionProps) {
   return (
     <AnimatePresence onExitComplete={onComplete}>
@@ -34,7 +41,7 @@ export function SandstormTransition({ show, onComplete }: SandstormTransitionPro
           />
 
           {/* Horizontal sand streaks */}
-          {[...Array(8)].map((_, i) => (
+          {STREAKS.map((streak, i) => (
             <motion.div
               key={i}
               className="absolute h-px"
@@ -42,13 +49,13 @@ export function SandstormTransition({ show, onComplete }: SandstormTransitionPro
                 top: `${10 + i * 12}%`,
                 left: 0,
                 right: 0,
-                background: `linear-gradient(90deg, transparent, rgba(197, 160, 89, ${0.1 + Math.random() * 0.2}), transparent)`,
-                height: `${1 + Math.random() * 3}px`,
+                background: `linear-gradient(90deg, transparent, rgba(197, 160, 89, ${streak.opacity}), transparent)`,
+                height: `${streak.height}px`,
               }}
               initial={{ x: "-100%" }}
               animate={{ x: "100%" }}
               transition={{
-                duration: 0.4 + Math.random() * 0.3,
+                duration: streak.duration,
                 delay: i * 0.05,
                 ease: "linear",
               }}

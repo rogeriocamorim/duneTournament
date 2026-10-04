@@ -22,9 +22,20 @@ jobs:
       - name: Type-check and build
         run: npm run build
       - name: Lint
-        # Older animation components still have React Compiler lint errors
-        continue-on-error: true
         run: npm run lint
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Browser tests
+        run: npm run test:e2e
 
   server:
     runs-on: ubuntu-latest

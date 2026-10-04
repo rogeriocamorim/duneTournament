@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 interface SpiceExplosionProps {
   trigger: boolean;
@@ -51,11 +51,10 @@ export function SpiceExplosion({ trigger, onComplete, children }: SpiceExplosion
     setTimeout(() => onComplete?.(), 600);
   }, [onComplete]);
 
-  // Trigger particles when trigger changes to true
-  if (trigger) {
-    // Use microtask to avoid calling during render
-    queueMicrotask(createParticles);
-  }
+  // Burst particles whenever trigger turns true
+  useEffect(() => {
+    if (trigger) createParticles();
+  }, [trigger, createParticles]);
 
   return (
     <div ref={containerRef} className="relative">

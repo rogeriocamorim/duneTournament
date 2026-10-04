@@ -28,13 +28,15 @@ export function DramaticReveal({
 }: DramaticRevealProps) {
   const [revealedCount, setRevealedCount] = useState(0);
   const [isRevealing, setIsRevealing] = useState(false);
+  const [currentKey, setCurrentKey] = useState(roundKey);
   const controlsRef = useRef<HTMLDivElement>(null);
 
-  // Reset revealed count when the round changes
-  useEffect(() => {
+  // Reset revealed count when the round changes (adjusted during render)
+  if (currentKey !== roundKey) {
+    setCurrentKey(roundKey);
     setRevealedCount(0);
     setIsRevealing(false);
-  }, [roundKey]);
+  }
 
   // Fire onAllRevealed when all items are revealed
   const allRevealed = revealedCount >= items.length && items.length > 0;

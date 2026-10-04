@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "motion/react";
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { TableCard } from "../components/TableCard";
 import { DramaticReveal } from "../components/DramaticReveal";
 import { Leaderboard } from "../components/Leaderboard";
@@ -62,14 +62,16 @@ export function DashboardPage({
   testMode,
 }: DashboardPageProps) {
   const [activeTab, setActiveTab] = useState<TabView>("tables");
-  const [_showExplosion, setShowExplosion] = useState(false);
   const [showLeaderReveal, setShowLeaderReveal] = useState(false);
   const [leaderRevealDone, setLeaderRevealDone] = useState(false);
   const [manualLeaderReveal, setManualLeaderReveal] = useState(false);
   const [tablesRevealed, setTablesRevealed] = useState(false);
   const [showPlayerManager, setShowPlayerManager] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const lastRevealedRound = useRef<number>(0);
+  // Highest round number whose leader reveal has started
+  const [lastRevealedRound, setLastRevealedRound] = useState(0);
+  // Round index the Colosseum reveal flags were last synced for
+  const [syncedRoundIndex, setSyncedRoundIndex] = useState<number | null>(null);
 
   const isColosseum = state.mode === "colosseum";
   const isCustom = state.mode === "custom";
@@ -114,31 +116,29 @@ export function DashboardPage({
     (!currentRound || currentRound.isComplete) && stageRounds.length < stage.rounds;
 
   // When navigating rounds in Colosseum, skip reveal for already-viewed/complete rounds
-  useEffect(() => {
-    if (isColosseum && currentRound) {
-      if (currentRound.isComplete || currentRound.number <= lastRevealedRound.current) {
-        setLeaderRevealDone(true);
-        setTablesRevealed(true);
-      }
+  // (state adjusted during render when the displayed round changes)
+  if (isColosseum && syncedRoundIndex !== displayRoundIndex) {
+    setSyncedRoundIndex(displayRoundIndex);
+    if (currentRound && (currentRound.isComplete || currentRound.number <= lastRevealedRound)) {
+      setLeaderRevealDone(true);
+      setTablesRevealed(true);
     }
-  }, [isColosseum, displayRoundIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
-  // Auto-show leader reveal when a new incomplete round with leaders appears (Classic only)
-  useEffect(() => {
-    if (
-      !isColosseum &&
-      dramaticReveal &&
-      currentRound &&
-      !currentRound.isComplete &&
-      currentRound.availableLeaders &&
-      currentRound.number !== lastRevealedRound.current
-    ) {
-      lastRevealedRound.current = currentRound.number;
-      setShowLeaderReveal(true);
-      setLeaderRevealDone(false);
-      setTablesRevealed(false);
-    }
-  }, [dramaticReveal, currentRound, isColosseum]);
+  // Auto-show leader reveal when a new incomplete round with leaders appears (non-Colosseum)
+  if (
+    !isColosseum &&
+    dramaticReveal &&
+    currentRound &&
+    !currentRound.isComplete &&
+    currentRound.availableLeaders &&
+    currentRound.number !== lastRevealedRound
+  ) {
+    setLastRevealedRound(currentRound.number);
+    setShowLeaderReveal(true);
+    setLeaderRevealDone(false);
+    setTablesRevealed(false);
+  }
 
   const handleAutoFillResults = useCallback(() => {
     if (!currentRound) return;
@@ -161,7 +161,6 @@ export function DashboardPage({
 
   const handleGenerateRound = useCallback(() => {
     // Trigger explosion
-    setShowExplosion(true);
     const container = containerRef.current;
     if (container) {
       container.classList.add("shake");
@@ -189,7 +188,6 @@ export function DashboardPage({
 
     setTimeout(() => {
       onGenerateRound();
-      setShowExplosion(false);
     }, 400);
   }, [onGenerateRound]);
 

@@ -22,9 +22,7 @@ const ROUND_TYPE_LABELS: Record<string, string> = {
 };
 
 /** A no-op handler for read-only TableCards. */
-function _noop(_ri: number, _ti: number, _r: TableResult[]) {
-  // intentionally empty
-}
+const noop: (roundIndex: number, tableId: number, results: TableResult[]) => void = () => {};
 
 export function RoundHistory({ rounds, players, context }: RoundHistoryProps) {
   const completedRounds = rounds.filter((r) => r.isComplete);
@@ -128,7 +126,7 @@ export function RoundHistory({ rounds, players, context }: RoundHistoryProps) {
                 table={table}
                 players={players}
                 roundIndex={rounds.indexOf(round)}
-                onSubmitResults={_noop}
+                onSubmitResults={noop}
                 animationDelay={0}
                 placementPoints={roundProps?.placementPoints ?? round.placementPoints}
                 clock={roundProps?.clock}

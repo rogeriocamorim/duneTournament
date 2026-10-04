@@ -35,44 +35,52 @@ export function SpectatorPage({ pasteId, liveSlug }: SpectatorPageProps) {
   const [activeTab, setActiveTab] = useState<SpectatorTab>("standings");
   const [displayRoundIndex, setDisplayRoundIndex] = useState(0);
 
-  const loadStandings = async (silent = false) => {
-    if (!silent) {
-      setState("loading");
-      setError("");
-    }
+  const [reloadKey, setReloadKey] = useState(0);
 
-    try {
-      const standingsData = liveSlug
-        ? await getPublicSnapshot(liveSlug)
-        : await fetchStandingsBin(pasteId ?? "");
-      setSnapshot(standingsData);
-      setState("success");
-
-      // Default to the latest round for table view
-      if (!silent && standingsData.rounds && standingsData.rounds.length > 0) {
-        const navRounds = standingsData.metadata.mode === "custom"
-          ? standingsData.rounds
-          : standingsData.rounds.filter((r) => r.type === "qualifying");
-        setDisplayRoundIndex(navRounds.length - 1);
-      }
-    } catch (err) {
-      if (silent) return;
-      console.error("Failed to load standings:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to load tournament standings. Please try again."
-      );
-      setState("error");
-    }
-  };
-
+  // Load the snapshot (and keep refreshing live views). State is only set in
+  // promise callbacks; "Try Again" bumps reloadKey to run this again.
   useEffect(() => {
-    loadStandings();
-    if (!liveSlug) return;
-    const timer = setInterval(() => loadStandings(true), LIVE_REFRESH_MS);
-    return () => clearInterval(timer);
-  }, [pasteId, liveSlug]); // eslint-disable-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    const fetchSnapshot = () => (liveSlug ? getPublicSnapshot(liveSlug) : fetchStandingsBin(pasteId ?? ""));
+
+    const load = (first: boolean) =>
+      fetchSnapshot()
+        .then((standingsData) => {
+          if (cancelled) return;
+          setSnapshot(standingsData);
+          setState("success");
+          // Default to the latest round for table view
+          if (first && standingsData.rounds && standingsData.rounds.length > 0) {
+            const navRounds = standingsData.metadata.mode === "custom"
+              ? standingsData.rounds
+              : standingsData.rounds.filter((r) => r.type === "qualifying");
+            setDisplayRoundIndex(navRounds.length - 1);
+          }
+        })
+        .catch((err: unknown) => {
+          if (cancelled || !first) return;
+          console.error("Failed to load standings:", err);
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to load tournament standings. Please try again."
+          );
+          setState("error");
+        });
+
+    void load(true);
+    const timer = liveSlug ? setInterval(() => void load(false), LIVE_REFRESH_MS) : undefined;
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
+  }, [pasteId, liveSlug, reloadKey]);
+
+  const retry = () => {
+    setState("loading");
+    setError("");
+    setReloadKey((k) => k + 1);
+  };
 
   // Convert snapshot standings to Player format for Leaderboard component
   const standingsPlayers: Player[] = snapshot
@@ -145,7 +153,7 @@ export function SpectatorPage({ pasteId, liveSlug }: SpectatorPageProps) {
           </h2>
           <p className="text-sm text-sand-dark mb-6">{error}</p>
           <button
-            onClick={() => loadStandings()}
+            onClick={retry}
             className="btn-imperial-filled py-2 px-6 inline-flex items-center gap-2"
           >
             <RefreshCw size={16} />
@@ -168,21 +176,6 @@ export function SpectatorPage({ pasteId, liveSlug }: SpectatorPageProps) {
       : diffMinutes < 60
       ? `${diffMinutes} minute${diffMinutes > 1 ? "s" : ""} ago`
       : `${Math.floor(diffMinutes / 60)} hour${Math.floor(diffMinutes / 60) > 1 ? "s" : ""} ago`;
-
-  /** Tab button helper */
-  const TabBtn = ({ tab, icon, label }: { tab: SpectatorTab; icon: React.ReactNode; label: string }) => (
-    <button
-      onClick={() => setActiveTab(tab)}
-      className={`flex items-center gap-2 px-4 py-2 text-sm uppercase tracking-widest transition-all ${
-        activeTab === tab
-          ? "text-spice border-b-2 border-spice"
-          : "text-sand-dark hover:text-sand"
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
-  );
 
   return (
     <div className="min-h-screen">
@@ -220,10 +213,10 @@ export function SpectatorPage({ pasteId, liveSlug }: SpectatorPageProps) {
 
         {/* Tab Bar */}
         <div className="flex justify-center gap-1 mb-6 flex-wrap border-b border-white/10 pb-2">
-          {hasFullData && <TabBtn tab="tables" icon={<Swords size={16} />} label="Tables" />}
-          {hasFullData && isColosseum && <TabBtn tab="groups" icon={<Users size={16} />} label="Standings" />}
-          <TabBtn tab="standings" icon={<BarChart3 size={16} />} label="Overall" />
-          {hasFullData && completedRounds.length > 1 && <TabBtn tab="history" icon={<History size={16} />} label="History" />}
+          {hasFullData && <TabBtn tab="tables" active={activeTab} onSelect={setActiveTab} icon={<Swords size={16} />} label="Tables" />}
+          {hasFullData && isColosseum && <TabBtn tab="groups" active={activeTab} onSelect={setActiveTab} icon={<Users size={16} />} label="Standings" />}
+          <TabBtn tab="standings" active={activeTab} onSelect={setActiveTab} icon={<BarChart3 size={16} />} label="Overall" />
+          {hasFullData && completedRounds.length > 1 && <TabBtn tab="history" active={activeTab} onSelect={setActiveTab} icon={<History size={16} />} label="History" />}
         </div>
 
         {/* ---- Tables Tab ---- */}
@@ -376,5 +369,30 @@ export function SpectatorPage({ pasteId, liveSlug }: SpectatorPageProps) {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+interface TabBtnProps {
+  tab: SpectatorTab;
+  active: SpectatorTab;
+  onSelect: (tab: SpectatorTab) => void;
+  icon: React.ReactNode;
+  label: string;
+}
+
+/** Tab button of the spectator view */
+function TabBtn({ tab, active, onSelect, icon, label }: TabBtnProps) {
+  return (
+    <button
+      onClick={() => onSelect(tab)}
+      className={`flex items-center gap-2 px-4 py-2 text-sm uppercase tracking-widest transition-all ${
+        active === tab
+          ? "text-spice border-b-2 border-spice"
+          : "text-sand-dark hover:text-sand"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }

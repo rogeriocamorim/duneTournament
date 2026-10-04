@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Shuffle, Trophy, Swords, ChevronRight } from "lucide-react";
 import type { Player, Round, TierDef } from "../engine/types";
@@ -86,20 +86,21 @@ export function KnockoutRandomizer({ players, rounds, onConfirm, tierLabels, tie
   const label = (slot: BracketSlot) =>
     tierLabels?.[slot] ?? (slot === "sf1" ? "A" : slot === "sf2" ? "B" : "C");
   // Build group winners (1st) and runners-up (2nd) per group
-  const groups = new Map<number, Player[]>();
-  for (let i = 0; i < 8; i++) groups.set(i, []);
-  for (const p of players) groups.get(p.groupId ?? 0)?.push(p);
+  const { groupWinners, groupRunnerUps } = useMemo(() => {
+    const groups = new Map<number, Player[]>();
+    for (let i = 0; i < 8; i++) groups.set(i, []);
+    for (const p of players) groups.get(p.groupId ?? 0)?.push(p);
 
-  const groupWinners: { player: Player; groupName: string }[] = [];
-  const groupRunnerUps: { player: Player; groupName: string }[] = [];
-
-  for (let gid = 0; gid < 8; gid++) {
-    const gPlayers = groups.get(gid) ?? [];
-    const sorted = sortGroupPlayers(gPlayers, rounds);
-    const groupName = GROUP_NAMES[gid];
-    if (sorted[0]) groupWinners.push({ player: sorted[0], groupName });
-    if (sorted[1]) groupRunnerUps.push({ player: sorted[1], groupName });
-  }
+    const winners: { player: Player; groupName: string }[] = [];
+    const runnerUps: { player: Player; groupName: string }[] = [];
+    for (let gid = 0; gid < 8; gid++) {
+      const sorted = sortGroupPlayers(groups.get(gid) ?? [], rounds);
+      const groupName = GROUP_NAMES[gid];
+      if (sorted[0]) winners.push({ player: sorted[0], groupName });
+      if (sorted[1]) runnerUps.push({ player: sorted[1], groupName });
+    }
+    return { groupWinners: winners, groupRunnerUps: runnerUps };
+  }, [players, rounds]);
 
   const [sf1a, setSf1a] = useState<{ player: Player; groupName: string }[]>([]);
   const [sf1b, setSf1b] = useState<{ player: Player; groupName: string }[]>([]);

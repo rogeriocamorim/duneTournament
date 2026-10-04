@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "motion/react";
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { TableCard } from "../components/TableCard";
 import { DramaticReveal } from "../components/DramaticReveal";
 import { Leaderboard } from "../components/Leaderboard";
@@ -46,7 +46,8 @@ export function Top8Page({
   const [activePanel, setActivePanel] = useState<"standings" | "leaders" | "draftstats" | "history" | null>(null);
   const [showLeaderReveal, setShowLeaderReveal] = useState(false);
   const [leaderRevealDone, setLeaderRevealDone] = useState(false);
-  const lastRevealedRound = useRef<number>(0);
+  // Highest bracket round number whose leader reveal has started
+  const [lastRevealedRound, setLastRevealedRound] = useState(0);
 
   const isColosseum = state.mode === "colosseum";
   const top8 = getTop8(state);
@@ -77,20 +78,19 @@ export function Top8Page({
     (currentRound.type === "semifinal" || currentRound.type === "winners-final");
 
   // Auto-show leader reveal when a new incomplete elimination round with leaders appears (Classic only)
-  useEffect(() => {
-    if (
-      !isColosseum &&
-      dramaticReveal &&
-      lastElimRound &&
-      !lastElimRound.isComplete &&
-      lastElimRound.availableLeaders &&
-      lastElimRound.number !== lastRevealedRound.current
-    ) {
-      lastRevealedRound.current = lastElimRound.number;
-      setShowLeaderReveal(true);
-      setLeaderRevealDone(false);
-    }
-  }, [dramaticReveal, lastElimRound, isColosseum]);
+  // (state adjusted during render when a new round shows up)
+  if (
+    !isColosseum &&
+    dramaticReveal &&
+    lastElimRound &&
+    !lastElimRound.isComplete &&
+    lastElimRound.availableLeaders &&
+    lastElimRound.number !== lastRevealedRound
+  ) {
+    setLastRevealedRound(lastElimRound.number);
+    setShowLeaderReveal(true);
+    setLeaderRevealDone(false);
+  }
 
   const handleStartTop8 = useCallback(() => {
     onStartTop8();

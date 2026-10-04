@@ -300,10 +300,10 @@ test.describe("Classic Mode — Qualifying Dashboard", () => {
     await expect(page.getByText("8 Players")).toBeVisible();
   });
 
-  test("shows tab navigation with Tables, Standings, Leaders", async ({ page }) => {
+  test("shows tab navigation with Tables and Overall (Leaders only once finished)", async ({ page }) => {
     await expect(page.getByRole("button", { name: "Tables", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Standings", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Leaders", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Overall", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Leaders", exact: true })).not.toBeVisible();
   });
 
   test("does NOT show Groups or Seats tabs in Classic mode", async ({ page }) => {
@@ -318,8 +318,8 @@ test.describe("Classic Mode — Qualifying Dashboard", () => {
     await expect(page.getByText("Round 1 Complete")).toBeVisible({ timeout: 5_000 });
   });
 
-  test("can navigate to Standings tab", async ({ page }) => {
-    await page.getByRole("button", { name: "Standings", exact: true }).click();
+  test("can navigate to Overall standings tab", async ({ page }) => {
+    await page.getByRole("button", { name: "Overall", exact: true }).click();
     // Should see the leaderboard with column headers
     await expect(page.getByText("Pts")).toBeVisible({ timeout: 5_000 });
   });
@@ -539,10 +539,11 @@ test.describe("Colosseum Mode — No Leader UI", () => {
     await expect(page.getByRole("button", { name: "Leaders", exact: true })).not.toBeVisible();
   });
 
-  test("qualifying dashboard does NOT show leader dropdown in table cards", async ({ page }) => {
+  test("qualifying table cards record seat and picked leader", async ({ page }) => {
     await goToColosseumDashboard(page);
-    // No "Leader..." dropdown should be present
-    await expect(page.locator("select option:text('Leader...')")).toHaveCount(0);
+    // Each player row has a Seat and a Pick selector instead of a drawn leader pool
+    await expect(page.getByText("Seat", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Pick", { exact: true }).first()).toBeVisible();
   });
 
   test("qualifying dashboard does NOT show round leaders button", async ({ page }) => {
@@ -551,15 +552,15 @@ test.describe("Colosseum Mode — No Leader UI", () => {
     await expect(page.getByRole("button", { name: /Round \d+ Leaders/ })).not.toBeVisible();
   });
 
-  test("qualifying dashboard shows Seats tab (draft stats)", async ({ page }) => {
+  test("qualifying dashboard hides Seats tab until the tournament is finished", async ({ page }) => {
     await goToColosseumDashboard(page);
-    await expect(page.getByRole("button", { name: "Seats", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Seats", exact: true })).not.toBeVisible();
   });
 
-  test("knockout stage does NOT show leader dropdown in table cards", async ({ page }) => {
+  test("knockout table cards record seat and picked leader", async ({ page }) => {
     await goToColosseumKnockout(page);
-    // No leader dropdown
-    await expect(page.locator("select option:text('Leader...')")).toHaveCount(0);
+    await expect(page.getByText("Seat", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Pick", { exact: true }).first()).toBeVisible();
   });
 
   test("knockout stage does NOT show Show Leaders button", async ({ page }) => {
@@ -699,5 +700,47 @@ test.describe("Colosseum Mode — Full Knockout Flow", () => {
     // Should show winner
     await expect(page.getByText("The Prophecy Fulfilled")).toBeVisible({ timeout: 5_000 });
     await expect(page.getByText("Emperor of the Known Universe")).toBeVisible();
+  });
+});
+
+// ===== CUSTOM FORMAT =====
+
+test.describe("Custom Format — Swiss + Final Table", () => {
+  test("plays every stage with custom points and the chess clock", async ({ page }) => {
+    await resetState(page);
+    await waitForModeSelector(page);
+    await page.getByRole("heading", { name: "Swiss + Final Table", exact: true }).click();
+    await page.getByRole("button", { name: "Create Swiss + Final Table Tournament" }).click();
+    await expect(page.getByText("The Summoning")).toBeVisible({ timeout: 5_000 });
+
+    // Settings: 5/3/1/0 points and a 30 minute clock
+    await page.getByRole("button", { name: /Format & Tiers/ }).click();
+    await page.getByRole("button", { name: /Points & Clock/ }).click();
+    const points = page.locator("input[type=number]");
+    for (const [i, value] of ["5", "3", "1", "0"].entries()) await points.nth(i).fill(value);
+    await page.getByText("Chess clock").click();
+    await page.getByRole("button", { name: "Save Settings" }).click();
+
+    await autoFillPlayers(page, 8);
+    await disableDramaticReveal(page);
+    await page.getByRole("button", { name: "Begin the Jihad" }).click();
+    await expect(page.getByText(/Stage 1 \/ 2/)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByLabel(/Minutes used by/).first()).toBeVisible();
+
+    // Qualifying: 3 rounds
+    for (let round = 1; round <= 3; round++) {
+      if (round > 1) await page.getByRole("button", { name: new RegExp(`Qualifying.*Round ${round}`) }).click();
+      await page.getByRole("button", { name: "Auto Fill All Tables" }).click();
+    }
+    await expect(page.getByText("Qualifying Complete")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("4 players advance to")).toBeVisible();
+
+    // Final table, then crown the winner
+    await page.getByRole("button", { name: /Begin Final/ }).click();
+    await page.getByRole("button", { name: /Final.*Round 1/ }).click({ timeout: 10_000 });
+    await page.getByRole("button", { name: "Auto Fill All Tables" }).click();
+    await page.getByRole("button", { name: /Crown the Emperor/ }).click();
+    await expect(page.getByText("Emperor of the Known Universe")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Tournament Complete")).toBeVisible();
   });
 });
