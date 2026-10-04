@@ -3,10 +3,14 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Round, Player, TableResult } from "../engine/types";
 import { TableCard } from "./TableCard";
+import type { FormatContext } from "../engine/format";
+import { getRoundStageName, getTableCardRoundProps } from "../engine/format";
 
 interface RoundHistoryProps {
   rounds: Round[];
   players: Player[];
+  /** Tournament mode/format/tiers — enables stage names, points and clock display */
+  context?: FormatContext;
 }
 
 const ROUND_TYPE_LABELS: Record<string, string> = {
@@ -22,7 +26,7 @@ function _noop(_ri: number, _ti: number, _r: TableResult[]) {
   // intentionally empty
 }
 
-export function RoundHistory({ rounds, players }: RoundHistoryProps) {
+export function RoundHistory({ rounds, players, context }: RoundHistoryProps) {
   const completedRounds = rounds.filter((r) => r.isComplete);
   const [selectedIndex, setSelectedIndex] = useState(completedRounds.length - 1);
 
@@ -35,7 +39,10 @@ export function RoundHistory({ rounds, players }: RoundHistoryProps) {
   }
 
   const round = completedRounds[selectedIndex];
-  const label = ROUND_TYPE_LABELS[round.type] ?? round.type;
+  const label = context?.mode === "custom"
+    ? getRoundStageName(context, round)
+    : ROUND_TYPE_LABELS[round.type] ?? round.type;
+  const roundProps = context ? getTableCardRoundProps(context, round) : undefined;
   const hasPrev = selectedIndex > 0;
   const hasNext = selectedIndex < completedRounds.length - 1;
 
@@ -123,6 +130,9 @@ export function RoundHistory({ rounds, players }: RoundHistoryProps) {
                 roundIndex={rounds.indexOf(round)}
                 onSubmitResults={_noop}
                 animationDelay={0}
+                placementPoints={roundProps?.placementPoints ?? round.placementPoints}
+                clock={roundProps?.clock}
+                mode={roundProps?.mode}
               />
             </div>
           ))}

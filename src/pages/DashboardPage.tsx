@@ -9,16 +9,33 @@ import { SeatPickStatsPanel } from "../components/SeatPickStatsPanel";
 import { RoundHistory } from "../components/RoundHistory";
 import { LeaderReveal } from "../components/animations/LeaderReveal";
 import { PlayerManager } from "../components/PlayerManager";
+import { ManualPairingModal } from "../components/ManualPairingModal";
 import type { TournamentState, TableResult } from "../engine/types";
-import { getLeaderInfo, getLeaderImageUrl } from "../engine/types";
+import { getLeaderInfo } from "../engine/types";
+import {
+  computeAdvancement,
+  getCustomFinalStandings,
+  getFormat,
+  getRoundStageName,
+  getStageEntrants,
+  getStageRounds,
+  getStageStandings,
+  getTableCardRoundProps,
+  getTierColor,
+  getTiers,
+  isStageComplete,
+} from "../engine/format";
+import { LeaderImage } from "../components/LeaderImage";
 import { generateRandomTableResults } from "../engine/testUtils";
 import { getTierForRound } from "../engine/tournament";
 import { exportGroupsCSV } from "../utils/csvExport";
-import { Trophy, Swords, BarChart3, Crown, Eye, FlaskConical, History, Users, Armchair, Download, UserCog } from "lucide-react";
+import { Trophy, Swords, BarChart3, Crown, Eye, FlaskConical, History, Users, Armchair, Download, UserCog, ChevronRight } from "lucide-react";
 
 interface DashboardPageProps {
   state: TournamentState;
-  onGenerateRound: () => void;
+  onGenerateRound: (tables?: string[][]) => void;
+  /** Custom mode: move to the next stage (or finish after the last one) */
+  onAdvanceStage?: () => void;
   onSubmitResults: (roundIndex: number, tableId: number, results: TableResult[]) => void;
   onBatchSubmitResults: (roundIndex: number, tables: { tableId: number; results: TableResult[] }[]) => void;
   onStartTop8: () => void;
@@ -34,6 +51,7 @@ type TabView = "tables" | "groups" | "standings" | "leaders" | "seats" | "histor
 export function DashboardPage({
   state,
   onGenerateRound,
+  onAdvanceStage,
   onSubmitResults,
   onBatchSubmitResults,
   onStartTop8,
@@ -54,6 +72,23 @@ export function DashboardPage({
   const lastRevealedRound = useRef<number>(0);
 
   const isColosseum = state.mode === "colosseum";
+  const isCustom = state.mode === "custom";
+  const isFinished = state.phase === "finished";
+  const format = getFormat(state);
+  const tiers = getTiers(state);
+  const [showManualPairing, setShowManualPairing] = useState(false);
+  const [standingsView, setStandingsView] = useState<"stage" | "overall">("stage");
+
+  // ── Custom mode: current stage ──
+  const stageIndex = state.currentStage ?? 0;
+  const stage = isCustom ? format.stages[stageIndex] : undefined;
+  const nextStage = isCustom ? format.stages[stageIndex + 1] : undefined;
+  const stageRounds = isCustom ? getStageRounds(state, stageIndex) : [];
+  const stageComplete = isCustom && isStageComplete(state, stageIndex);
+  const stagePlayers = isCustom
+    ? getStageEntrants(state, stageIndex).map((id) => state.players.find((p) => p.id === id)!).filter(Boolean)
+    : [];
+  const advancingIds = isCustom && stageComplete && nextStage ? computeAdvancement(state, stageIndex) : [];
 
   // Colosseum: navigate between pre-generated rounds (0-indexed into state.rounds)
   const [displayRoundIndex, setDisplayRoundIndex] = useState(() => {
@@ -72,8 +107,11 @@ export function DashboardPage({
     (r) => r.type === "qualifying" && r.isComplete
   ).length;
   const needsNewRound = !isColosseum && (!currentRound || currentRound.isComplete);
-  const qualifyingDone =
-    completedQualifying >= state.settings.totalQualifyingRounds;
+  const qualifyingDone = isCustom
+    ? false
+    : completedQualifying >= state.settings.totalQualifyingRounds;
+  const canGenerateStageRound = isCustom && !isFinished && !!stage &&
+    (!currentRound || currentRound.isComplete) && stageRounds.length < stage.rounds;
 
   // When navigating rounds in Colosseum, skip reveal for already-viewed/complete rounds
   useEffect(() => {
@@ -108,13 +146,18 @@ export function DashboardPage({
     for (const table of currentRound.tables) {
       if (!table.isComplete) {
         const results = generateRandomTableResults(table, currentRound.availableLeaders, state.mode);
+        const clock = getTableCardRoundProps(state, currentRound).clock;
+        if (clock) {
+          // Test data: minutes spread around the budget so some players get penalties
+          for (const r of results) r.minutesUsed = Math.round((clock.budgetMinutes * (0.7 + Math.random() * 0.45)) * 10) / 10;
+        }
         batch.push({ tableId: table.id, results });
       }
     }
     if (batch.length > 0) {
       onBatchSubmitResults(activeRoundIndex, batch);
     }
-  }, [currentRound, activeRoundIndex, onBatchSubmitResults, state.mode]);
+  }, [currentRound, activeRoundIndex, onBatchSubmitResults, state]);
 
   const handleGenerateRound = useCallback(() => {
     // Trigger explosion
@@ -150,6 +193,19 @@ export function DashboardPage({
     }, 400);
   }, [onGenerateRound]);
 
+  const handleGenerateClick = () => {
+    if (isCustom && stage?.pairing === "manual") {
+      setShowManualPairing(true);
+      return;
+    }
+    handleGenerateRound();
+  };
+
+  // Custom mode standings: stage standings + final standings once finished
+  const customFinalStandings = isCustom && isFinished ? getCustomFinalStandings(state) : undefined;
+  const stageStandings = isCustom && !isFinished && stageIndex > 0 ? getStageStandings(state, stageIndex) : undefined;
+  const customWinner = customFinalStandings?.[0];
+
   return (
     <div ref={containerRef} className="max-w-5xl mx-auto px-4 py-8 relative">
       {/* Header */}
@@ -161,6 +217,11 @@ export function DashboardPage({
         <h1 className="text-display text-2xl md:text-3xl text-spice spice-text-glow mb-1">
           {state.metadata.tournamentName}
         </h1>
+        {isCustom && stage && (
+          <p className="text-xs text-fremen-blue uppercase tracking-[0.3em] mb-1">
+            {isFinished ? "Tournament Complete" : `Stage ${stageIndex + 1} / ${format.stages.length} — ${stage.name}`}
+          </p>
+        )}
         <div className="flex items-center justify-center gap-4 text-xs text-sand-dark uppercase tracking-[0.2em]">
           <button
             onClick={() => setShowPlayerManager(true)}
@@ -172,7 +233,9 @@ export function DashboardPage({
           </button>
           <span className="text-spice">|</span>
           <span>
-            Round {currentRound?.number ?? 0} / {state.settings.totalQualifyingRounds}
+            {isCustom && stage
+              ? `Round ${stageRounds.length} / ${stage.rounds}`
+              : `Round ${currentRound?.number ?? 0} / ${state.settings.totalQualifyingRounds}`}
           </span>
           <span className="text-spice">|</span>
           <span className="text-spice">{state.phase}</span>
@@ -301,8 +364,7 @@ export function DashboardPage({
                   const inProgress =
                     !isComplete && round.tables.some((t) => t.isComplete);
                   const tier = round.leaderTier ?? getTierForRound(round.number, false);
-                  const tierColors: Record<string, string> = { A: "#ef4444", B: "#c5a059", C: "#38bdf8" };
-                  const tierColor = tierColors[tier] ?? "#c5a059";
+                  const tierColor = getTierColor(tiers, tier);
                   return (
                     <div key={round.number} className="flex flex-col items-center gap-1">
                       <span
@@ -333,8 +395,93 @@ export function DashboardPage({
             </div>
           )}
 
+          {/* Custom: winner banner */}
+          {isCustom && isFinished && customWinner && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 20 }}
+              className="text-center mb-10"
+            >
+              <div className="inline-block p-8 stone-card spice-glow rounded-sm">
+                <Crown size={48} className="text-[#FFD700] mx-auto mb-4" />
+                <h2 className="text-display text-3xl text-[#FFD700] mb-2">{customWinner.name}</h2>
+                <p className="text-sm text-spice uppercase tracking-widest">Emperor of the Known Universe</p>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Custom: Generate next round of the stage */}
+          {canGenerateStageRound && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center mb-8"
+            >
+              <button
+                onClick={handleGenerateClick}
+                className="btn-imperial-filled text-lg py-4 px-10"
+              >
+                <span className="flex items-center gap-3">
+                  <Swords size={20} />
+                  {stage?.name} &mdash; Round {stageRounds.length + 1}
+                </span>
+              </button>
+              {stage?.pairing === "manual" && (
+                <p className="text-xs text-sand-dark mt-2 uppercase tracking-widest">Tables are set manually</p>
+              )}
+            </motion.div>
+          )}
+
+          {/* Custom: stage complete → advance or finish */}
+          {isCustom && !isFinished && stageComplete && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center mb-8"
+            >
+              <div className="glass-morphism-strong rounded-sm p-8 inline-block max-w-2xl">
+                <Trophy size={32} className="text-spice mx-auto mb-4" />
+                <h2 className="text-display text-xl text-spice mb-2">{stage?.name} Complete</h2>
+                {nextStage ? (
+                  <>
+                    <p className="text-sm text-sand-dark mb-3">
+                      {advancingIds.length} players advance to <span className="text-spice">{nextStage.name}</span>
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-2 mb-5">
+                      {advancingIds.map((id, i) => (
+                        <span key={id} className="text-xs glass-morphism px-2 py-1 rounded-sm">
+                          <span className="fremen-glow mr-1">{i + 1}</span>
+                          {state.players.find((p) => p.id === id)?.name ?? id}
+                        </span>
+                      ))}
+                    </div>
+                    {advancingIds.length % 4 !== 0 && (
+                      <p className="text-xs text-blood mb-3">
+                        {advancingIds.length} players cannot be seated at tables of 4 &mdash; adjust the stage in Settings.
+                      </p>
+                    )}
+                    <button
+                      onClick={onAdvanceStage}
+                      disabled={advancingIds.length === 0 || advancingIds.length % 4 !== 0}
+                      className="btn-imperial-filled py-3 px-8 inline-flex items-center gap-2 disabled:opacity-40"
+                    >
+                      <ChevronRight size={18} />
+                      Begin {nextStage.name}
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={onAdvanceStage} className="btn-imperial-filled py-3 px-8 inline-flex items-center gap-2">
+                    <Crown size={18} />
+                    Crown the Emperor
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+
           {/* Classic: Generate Round / Advance */}
-          {!isColosseum && needsNewRound && !qualifyingDone && (
+          {!isColosseum && !isCustom && needsNewRound && !qualifyingDone && (
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -382,16 +529,18 @@ export function DashboardPage({
           {currentRound && (
             <div>
               <h2 className="text-display text-sm text-sand-dark mb-4 text-center">
-                Round {currentRound.number} &mdash;{" "}
-                {currentRound.type === "qualifying"
-                  ? "Qualifying"
-                  : currentRound.type === "semifinal"
-                  ? "Semifinal"
-                  : currentRound.type === "winners-final"
-                  ? "Winners & Losers Finals"
-                  : currentRound.type === "grand-final"
-                  ? "Grand Final"
-                  : currentRound.type}
+                Round {currentRound.number} &mdash; {getRoundStageName(state, currentRound)}
+                {currentRound.leaderTier && !isColosseum && (
+                  <span
+                    className="ml-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest rounded-sm border align-middle"
+                    style={{
+                      color: getTierColor(tiers, currentRound.leaderTier),
+                      borderColor: getTierColor(tiers, currentRound.leaderTier),
+                    }}
+                  >
+                    Tier {currentRound.leaderTier}
+                  </span>
+                )}
               </h2>
               {testMode && !currentRound.isComplete && (
                 <div className="flex justify-center mb-4">
@@ -419,9 +568,7 @@ export function DashboardPage({
                     onSubmitResults={onSubmitResults}
                     animationDelay={dramaticReveal ? 0 : index}
                     allowEdit
-                    availableLeaders={isColosseum ? undefined : currentRound.availableLeaders}
-                    leaderTier={isColosseum ? undefined : currentRound.leaderTier}
-                    mode={state.mode}
+                    {...getTableCardRoundProps(state, currentRound)}
                   />
                 ))}
               />
@@ -449,11 +596,7 @@ export function DashboardPage({
                               boxShadow: "0 0 12px rgba(197, 160, 89, 0.15)",
                             }}
                           >
-                            <img
-                              src={getLeaderImageUrl(info)}
-                              alt={info.name}
-                              className="w-24 md:w-32 h-auto block"
-                            />
+                            <LeaderImage leader={info} className="w-24 md:w-32 h-auto block" />
                             {info.isCommunity && (
                               <div className="absolute top-1 right-1 bg-fremen-blue/90 text-obsidian text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded-sm leading-tight">
                                 Community
@@ -473,7 +616,7 @@ export function DashboardPage({
           )}
 
           {/* Completed round summary */}
-          {currentRound?.isComplete && !qualifyingDone && (
+          {currentRound?.isComplete && !qualifyingDone && !isCustom && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -504,11 +647,40 @@ export function DashboardPage({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <Leaderboard
-            players={state.players}
-            highlightTop={qualifyingDone ? 16 : 0}
-            rounds={state.rounds}
-          />
+          {stageStandings && (
+            <div className="flex justify-center gap-2 mb-4">
+              {(["stage", "overall"] as const).map((view) => (
+                <button
+                  key={view}
+                  onClick={() => setStandingsView(view)}
+                  className={`px-3 py-1 text-xs uppercase tracking-widest rounded-sm transition-all ${
+                    standingsView === view
+                      ? "bg-spice/20 text-spice border border-spice/40"
+                      : "glass-morphism text-sand hover:text-spice border border-sand-dark/40"
+                  }`}
+                >
+                  {view === "stage" ? `${stage?.name ?? "Stage"} Standings` : "Overall"}
+                </button>
+              ))}
+            </div>
+          )}
+          {stageStandings && standingsView === "stage" ? (
+            <Leaderboard
+              players={stageStandings}
+              finalStandings={stageStandings}
+              rounds={state.rounds.filter((r) => r.stageIndex === stageIndex)}
+              tiers={tiers}
+              highlightTop={nextStage?.advancement.kind === "top-n" ? nextStage.advancement.n ?? 0 : 0}
+            />
+          ) : (
+            <Leaderboard
+              players={state.players}
+              highlightTop={qualifyingDone ? 16 : 0}
+              rounds={state.rounds}
+              finalStandings={customFinalStandings}
+              tiers={tiers}
+            />
+          )}
         </motion.div>
       )}
 
@@ -517,7 +689,7 @@ export function DashboardPage({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <LeaderStatsPanel rounds={state.rounds} />
+          <LeaderStatsPanel rounds={state.rounds} tiers={tiers} />
         </motion.div>
       )}
 
@@ -535,7 +707,7 @@ export function DashboardPage({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <RoundHistory rounds={state.rounds} players={state.players} />
+          <RoundHistory rounds={state.rounds} players={state.players} context={state} />
         </motion.div>
       )}
 
@@ -545,6 +717,7 @@ export function DashboardPage({
           <LeaderReveal
             leaders={currentRound.availableLeaders}
             tier={currentRound.leaderTier ?? "A"}
+            color={state.tiers ? getTierColor(tiers, currentRound.leaderTier) : undefined}
             skipToGrid={manualLeaderReveal}
             onComplete={() => {
               setShowLeaderReveal(false);
@@ -554,6 +727,20 @@ export function DashboardPage({
           />
         )}
       </AnimatePresence>
+
+      {/* Manual table assignment (custom stages with manual pairing) */}
+      {isCustom && (
+        <ManualPairingModal
+          isOpen={showManualPairing}
+          players={stagePlayers}
+          title={`${stage?.name ?? "Stage"} — Round ${stageRounds.length + 1} Tables`}
+          onClose={() => setShowManualPairing(false)}
+          onConfirm={(tables) => {
+            setShowManualPairing(false);
+            onGenerateRound(tables);
+          }}
+        />
+      )}
 
       {/* Player Manager Modal */}
       <PlayerManager

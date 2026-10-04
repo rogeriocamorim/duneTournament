@@ -1,14 +1,21 @@
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Shuffle, Trophy, Swords, ChevronRight } from "lucide-react";
-import type { Player, Round } from "../engine/types";
+import type { Player, Round, TierDef } from "../engine/types";
 import { getVpSharePct } from "../engine/tournament";
+import { getTierColor } from "../engine/format";
 
 interface KnockoutRandomizerProps {
   players: Player[];
   rounds: Round[];
   onConfirm: (sf1a: Player[], sf1b: Player[], elimA: Player[], elimB: Player[]) => void;
+  /** Tier labels for SF1/Eliminators, SF2 and the Final (from the format) */
+  tierLabels?: { sf1: string; sf2: string; final: string };
+  tiers?: TierDef[];
 }
+
+/** Which bracket round a badge describes */
+type BracketSlot = "sf1" | "sf2" | "final";
 
 function sortGroupPlayers(players: Player[], rounds: Round[]): Player[] {
   const cache = new Map<string, number>();
@@ -36,13 +43,12 @@ const GROUP_NAMES = [
   "Bene Tleilaxu","Ixian","Bene Gesserit","Fremen",
 ];
 
-function TierBadge({ tier }: { tier: "A"|"B"|"C" }) {
-  const colors = { A:"#ef4444", B:"#c5a059", C:"#38bdf8" };
-  const c = colors[tier];
+function TierBadge({ label, tiers }: { label: string; tiers?: TierDef[] }) {
+  const c = getTierColor(tiers, label);
   return (
     <span className="text-xs font-bold px-2 py-0.5 rounded-sm border ml-2"
       style={{ color:c, borderColor:c, background:`${c}18` }}>
-      {tier} TIER
+      {label} TIER
     </span>
   );
 }
@@ -57,15 +63,15 @@ function PlayerPill({ player, label, accent }: { player: Player; label: string; 
   );
 }
 
-function TableCard({ title, players, groupNames, accent, tier }: {
-  title: string; players: Player[]; groupNames: string[]; accent: string; tier: "A"|"B"|"C";
+function TableCard({ title, players, groupNames, accent, tier, tiers }: {
+  title: string; players: Player[]; groupNames: string[]; accent: string; tier: string; tiers?: TierDef[];
 }) {
   return (
     <div className="glass-morphism rounded-sm overflow-hidden" style={{ border:`1px solid ${accent}30` }}>
       <div className="px-4 py-2.5 flex items-center justify-between"
         style={{ background:`${accent}12`, borderBottom:`1px solid ${accent}20` }}>
         <span className="text-display text-xs uppercase tracking-widest font-bold" style={{ color:accent }}>{title}</span>
-        <TierBadge tier={tier} />
+        <TierBadge label={tier} tiers={tiers} />
       </div>
       <div className="px-4 py-2">
         {players.map((p, i) => (
@@ -76,7 +82,9 @@ function TableCard({ title, players, groupNames, accent, tier }: {
   );
 }
 
-export function KnockoutRandomizer({ players, rounds, onConfirm }: KnockoutRandomizerProps) {
+export function KnockoutRandomizer({ players, rounds, onConfirm, tierLabels, tiers }: KnockoutRandomizerProps) {
+  const label = (slot: BracketSlot) =>
+    tierLabels?.[slot] ?? (slot === "sf1" ? "A" : slot === "sf2" ? "B" : "C");
   // Build group winners (1st) and runners-up (2nd) per group
   const groups = new Map<number, Player[]>();
   for (let i = 0; i < 8; i++) groups.set(i, []);
@@ -150,25 +158,25 @@ export function KnockoutRandomizer({ players, rounds, onConfirm }: KnockoutRando
         <div className="flex items-center gap-2">
           <span className="text-red-400 font-bold w-32">SF1 A + SF1 B</span>
           <span className="text-sand-dark">8 group winners → 2 tables of 4</span>
-          <TierBadge tier="A" />
+          <TierBadge label={label("sf1")} tiers={tiers} />
           <span className="text-sand-dark ml-2">→ 2 winners advance to Final</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-red-400 font-bold w-32">Elim A + Elim B</span>
           <span className="text-sand-dark">8 runner-ups → 2 tables of 4</span>
-          <TierBadge tier="A" />
+          <TierBadge label={label("sf1")} tiers={tiers} />
           <span className="text-sand-dark ml-2">→ 2 winners advance to SF2</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-spice font-bold w-32">SF2 A + SF2 B</span>
           <span className="text-sand-dark">SF1 losers (6) + Elim winners (2) → 2 tables of 4</span>
-          <TierBadge tier="B" />
+          <TierBadge label={label("sf2")} tiers={tiers} />
           <span className="text-sand-dark ml-2">→ 2 winners advance to Final</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sky-400 font-bold w-32">Final</span>
           <span className="text-sand-dark">SF1A + SF1B + SF2A + SF2B winners</span>
-          <TierBadge tier="C" />
+          <TierBadge label={label("final")} tiers={tiers} />
         </div>
       </motion.div>
 
@@ -222,9 +230,9 @@ export function KnockoutRandomizer({ players, rounds, onConfirm }: KnockoutRando
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <TableCard title="SF1 — Table A" players={sf1a.map(x=>x.player)}
-                  groupNames={sf1a.map(x=>x.groupName)} accent="#ef4444" tier="A" />
+                  groupNames={sf1a.map(x=>x.groupName)} accent="#ef4444" tier={label("sf1")} tiers={tiers} />
                 <TableCard title="SF1 — Table B" players={sf1b.map(x=>x.player)}
-                  groupNames={sf1b.map(x=>x.groupName)} accent="#ef4444" tier="A" />
+                  groupNames={sf1b.map(x=>x.groupName)} accent="#ef4444" tier={label("sf1")} tiers={tiers} />
               </div>
             </div>
 
@@ -239,9 +247,9 @@ export function KnockoutRandomizer({ players, rounds, onConfirm }: KnockoutRando
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <TableCard title="Eliminator A" players={elimA.map(x=>x.player)}
-                  groupNames={elimA.map(x=>x.groupName)} accent="#ef4444" tier="A" />
+                  groupNames={elimA.map(x=>x.groupName)} accent="#ef4444" tier={label("sf1")} tiers={tiers} />
                 <TableCard title="Eliminator B" players={elimB.map(x=>x.player)}
-                  groupNames={elimB.map(x=>x.groupName)} accent="#ef4444" tier="A" />
+                  groupNames={elimB.map(x=>x.groupName)} accent="#ef4444" tier={label("sf1")} tiers={tiers} />
               </div>
             </div>
 
@@ -251,7 +259,7 @@ export function KnockoutRandomizer({ players, rounds, onConfirm }: KnockoutRando
                 <span className="text-display text-xs text-spice uppercase tracking-widest font-bold">
                   Semi-Final 2
                 </span>
-                <TierBadge tier="B" />
+                <TierBadge label={label("sf2")} tiers={tiers} />
               </div>
               <p className="text-xs text-sand-dark">
                 SF1A losers (3) + SF1B losers (3) + Elim A winner + Elim B winner
@@ -266,7 +274,7 @@ export function KnockoutRandomizer({ players, rounds, onConfirm }: KnockoutRando
                 <span className="text-display text-xs text-sky-400 uppercase tracking-widest font-bold">
                   The Final
                 </span>
-                <TierBadge tier="C" />
+                <TierBadge label={label("final")} tiers={tiers} />
               </div>
               <p className="text-xs text-sand-dark">
                 SF1A winner + SF1B winner + SF2A winner + SF2B winner

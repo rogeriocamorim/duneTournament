@@ -2,13 +2,16 @@ import { motion, AnimatePresence } from "motion/react";
 import { useState, useCallback } from "react";
 import type { LeaderTier } from "../../engine/types";
 import { getLeaderInfo, getLeaderImageUrl } from "../../engine/types";
+import { LeaderImage } from "../LeaderImage";
 import { ChevronRight, X } from "lucide-react";
 
 interface LeaderRevealProps {
   /** Leader display names to reveal */
   leaders: string[];
-  /** The tier being revealed (for accent color) */
+  /** The tier being revealed (label, e.g. "A" or "S+A") */
   tier: LeaderTier;
+  /** Accent color of the tier (defaults to the classic A/B/C colors) */
+  color?: string;
   /** Called when the reveal is dismissed */
   onComplete: () => void;
   /** Skip intro/individual reveals and jump straight to the grid */
@@ -21,11 +24,18 @@ const TIER_CONFIG: Record<string, { label: string; color: string; glow: string; 
   C: { label: "C Tier", color: "#CD7F32", glow: "rgba(205, 127, 50, 0.4)", border: "rgba(205, 127, 50, 0.6)" },
 };
 
-export function LeaderReveal({ leaders, tier, onComplete, skipToGrid: skipToGridProp }: LeaderRevealProps) {
+/** Accent config for any tier color */
+function configFromColor(label: string, color: string) {
+  return { label, color, glow: `${color}66`, border: `${color}99` };
+}
+
+export function LeaderReveal({ leaders, tier, color, onComplete, skipToGrid: skipToGridProp }: LeaderRevealProps) {
   const [currentIndex, setCurrentIndex] = useState(skipToGridProp ? leaders.length : -1); // -1 = intro, 0..6 = individual, 7+ = grid
   const [isAnimating, setIsAnimating] = useState(false);
 
-  const config = TIER_CONFIG[tier] ?? TIER_CONFIG.A;
+  const config = color
+    ? configFromColor(`${tier} Tier`, color)
+    : TIER_CONFIG[tier] ?? configFromColor(`${tier} Tier`, TIER_CONFIG.A.color);
   const showGrid = currentIndex >= leaders.length;
   const showIntro = currentIndex === -1;
 
@@ -161,6 +171,7 @@ export function LeaderReveal({ leaders, tier, onComplete, skipToGrid: skipToGrid
               <motion.img
                 src={getLeaderImageUrl(currentLeader)}
                 alt={currentLeader.name}
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
                 className="w-[48rem] md:w-[60rem] h-auto block max-w-[90vw]"
                 initial={{ filter: "brightness(0)" }}
                 animate={{ filter: "brightness(1)" }}
@@ -239,11 +250,7 @@ export function LeaderReveal({ leaders, tier, onComplete, skipToGrid: skipToGrid
                         boxShadow: `0 0 15px ${config.glow}`,
                       }}
                     >
-                      <img
-                        src={getLeaderImageUrl(info)}
-                        alt={info.name}
-                        className="w-48 md:w-64 h-auto block"
-                      />
+                      <LeaderImage leader={info} className="w-48 md:w-64 h-auto block" />
                       {info.isCommunity && (
                         <div className="absolute top-1 right-1 bg-fremen-blue/90 text-obsidian text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded-sm leading-tight">
                           Community

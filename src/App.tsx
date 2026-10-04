@@ -11,7 +11,10 @@ import { KnockoutRandomizer } from "./pages/KnockoutRandomizer";
 import { GuildNavigator } from "./components/GuildNavigator";
 import { ShareModal } from "./components/ShareModal";
 import { SandstormTransition } from "./components/animations/SandstormTransition";
+import { TournamentSettingsModal } from "./components/TournamentSettingsModal";
 import { verifyResetPassphrase } from "./engine/types";
+import { describeTierRule, getFormat, resolveTierRule } from "./engine/format";
+import { setAdminToken } from "./api/client";
 import {
   RotateCcw,
   Database,
@@ -19,24 +22,30 @@ import {
   Share2,
   Lock,
   FlaskConical,
+  Settings,
+  LogOut,
+  KeyRound,
+  AlertTriangle,
 } from "lucide-react";
 
 
 function App() {
-  // Check for spectator mode from URL params
-  const [spectatorBinId, setSpectatorBinId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const binId = params.get("view");
-    if (binId) {
-      setSpectatorBinId(binId);
-    }
-  }, []);
+  // Check for spectator mode from URL params (?view= JSONBin snapshot, ?live= server tournament)
+  const [spectatorBinId] = useState<string | null>(() => new URLSearchParams(window.location.search).get("view"));
+  const [spectatorLiveSlug] = useState<string | null>(() => new URLSearchParams(window.location.search).get("live"));
 
   const {
     state,
-    selectMode,
+    apiMode,
+    apiError,
+    clearApiError,
+    busy,
+    loading,
+    openTournament,
+    createFromTemplate,
+    updateFormat,
+    addPlayers,
+    advanceStage,
     addPlayer,
     removePlayer,
     renamePlayer,
@@ -67,6 +76,9 @@ function App() {
   const [resetPassphrase, setResetPassphrase] = useState("");
   const [resetError, setResetError] = useState(false);
   const [resetVerifying, setResetVerifying] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [tokenInput, setTokenInput] = useState("");
+  const needsToken = apiError?.status === 401;
 
   // ===== ESCAPE KEY HANDLER =====
   useEffect(() => {
@@ -97,13 +109,14 @@ function App() {
   const handleStart = useCallback(() => {
     transitionTo(() => {
       startTournament();
-      // Classic mode: generate first round immediately
+      // Classic/custom: generate first round immediately (manual pairing waits for the organizer)
       // Colosseum mode: goes to group-draw phase, rounds generated after assignments
-      if (state.mode === "classic") {
+      const firstStage = getFormat(state).stages[0];
+      if (state.mode === "classic" || (state.mode === "custom" && firstStage?.pairing !== "manual")) {
         generateRound();
       }
     });
-  }, [transitionTo, startTournament, generateRound, state.mode]);
+  }, [transitionTo, startTournament, generateRound, state]);
 
   const handleStartTop8 = useCallback(() => {
     transitionTo(() => {
@@ -141,9 +154,21 @@ function App() {
   }, [generateShareableLink]);
 
   // If in spectator mode, render SpectatorPage only
+  if (spectatorLiveSlug) {
+    return <SpectatorPage liveSlug={spectatorLiveSlug} />;
+  }
   if (spectatorBinId) {
     return <SpectatorPage pasteId={spectatorBinId} />;
   }
+
+  // Colosseum knockout tier labels come from the bracket stage rules
+  const bracketStage = getFormat(state).stages[1];
+  const knockoutTierLabels = {
+    sf1: describeTierRule(resolveTierRule(bracketStage, 1)),
+    sf2: describeTierRule(resolveTierRule(bracketStage, 2)),
+    final: describeTierRule(resolveTierRule(bracketStage, 3)),
+  };
+  const isCustom = state.mode === "custom";
 
   return (
     <div className="min-h-screen relative">
@@ -158,6 +183,18 @@ function App() {
       >
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-end">
           <div className="flex items-center gap-2">
+            {busy && (
+              <span className="text-[10px] uppercase tracking-widest text-fremen-blue animate-pulse mr-2">Saving…</span>
+            )}
+            {state.phase !== "home" && (
+              <button
+                onClick={() => setShowSettings(true)}
+                className="p-2 text-sand-dark hover:text-spice transition-colors"
+                title="Tournament Settings (format, points, tiers, clock)"
+              >
+                <Settings size={16} />
+              </button>
+            )}
             <button
               onClick={toggleDramaticReveal}
               className={`p-2 transition-colors ${
@@ -199,27 +236,63 @@ function App() {
             >
               <FlaskConical size={16} />
             </button>
-            <button
-              onClick={() => setShowResetConfirm(true)}
-              className="p-2 text-sand-dark hover:text-blood transition-colors"
-              title="Reset Tournament"
-            >
-              <RotateCcw size={16} />
-            </button>
+            {apiMode ? (
+              state.phase !== "home" && (
+                <button
+                  onClick={resetTournament}
+                  className="p-2 text-sand-dark hover:text-spice transition-colors"
+                  title="Back to tournament list (data stays saved)"
+                >
+                  <LogOut size={16} />
+                </button>
+              )
+            ) : (
+              <button
+                onClick={() => setShowResetConfirm(true)}
+                className="p-2 text-sand-dark hover:text-blood transition-colors"
+                title="Reset Tournament"
+              >
+                <RotateCcw size={16} />
+              </button>
+            )}
           </div>
         </div>
       </motion.nav>
 
+      {/* Server errors */}
+      {apiError && !needsToken && (
+        <div className="max-w-3xl mx-auto px-4">
+          <div className="px-4 py-2 rounded-sm bg-blood/20 border border-blood/50 flex items-center gap-2 text-xs text-red-300">
+            <AlertTriangle size={14} className="shrink-0" />
+            <span className="flex-1">Server error: {apiError.message}</span>
+            <button onClick={clearApiError} className="uppercase tracking-widest hover:text-white">Dismiss</button>
+          </div>
+        </div>
+      )}
+
+      {/* Loading a tournament from the server */}
+      {loading && (
+        <div className="text-center py-24">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-spice mb-4"></div>
+          <p className="text-sand-dark uppercase tracking-widest text-sm">Loading tournament…</p>
+        </div>
+      )}
+
       {/* Main Content */}
       <AnimatePresence mode="wait">
-        {state.phase === "home" && (
+        {!loading && state.phase === "home" && (
           <motion.div
             key="home"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <ModeSelectorPage onSelectMode={selectMode} />
+            <ModeSelectorPage
+              onCreate={(templateId, tierPresetId, name) => void createFromTemplate(templateId, tierPresetId, name)}
+              apiMode={apiMode}
+              onOpenTournament={openTournament}
+              busy={busy}
+            />
           </motion.div>
         )}
 
@@ -233,7 +306,10 @@ function App() {
             <RegistrationPage
               players={state.players}
               onAddPlayer={addPlayer}
+              onAddPlayers={addPlayers}
               onRemovePlayer={removePlayer}
+              onOpenSettings={() => setShowSettings(true)}
+              format={state.format}
               onStart={handleStart}
               testMode={state.settings.testMode}
               mode={state.mode}
@@ -257,7 +333,7 @@ function App() {
           </motion.div>
         )}
 
-        {state.phase === "qualifying" && (
+        {(state.phase === "qualifying" || (isCustom && state.phase === "finished")) && (
           <motion.div
             key="qualifying"
             initial={{ opacity: 0 }}
@@ -267,6 +343,7 @@ function App() {
             <DashboardPage
               state={state}
               onGenerateRound={generateRound}
+              onAdvanceStage={() => transitionTo(advanceStage)}
               onSubmitResults={submitTableResults}
               onBatchSubmitResults={batchSubmitTableResults}
               onStartTop8={handleStartTop8}
@@ -289,6 +366,8 @@ function App() {
             <KnockoutRandomizer
               players={state.players}
               rounds={state.rounds}
+              tierLabels={knockoutTierLabels}
+              tiers={state.tiers}
               onConfirm={(sf1a, sf1b, elimA, elimB) => {
                 const tables = [
                   sf1a.map((p) => p.id),
@@ -302,7 +381,7 @@ function App() {
           </motion.div>
         )}
 
-        {(state.phase === "top8" || state.phase === "finished") && (
+        {!isCustom && (state.phase === "top8" || state.phase === "finished") && (
           <motion.div
             key="top8"
             initial={{ opacity: 0 }}
@@ -329,6 +408,60 @@ function App() {
         onExport={exportState}
         onImport={importState}
       />
+
+      {/* Tournament Settings */}
+      <TournamentSettingsModal
+        isOpen={showSettings}
+        state={state}
+        onClose={() => setShowSettings(false)}
+        onSave={updateFormat}
+      />
+
+      {/* Admin token prompt (server rejected a change) */}
+      <AnimatePresence>
+        {needsToken && (
+          <motion.div
+            className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-black/80"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="glass-morphism-strong rounded-sm p-8 max-w-sm w-full text-center">
+              <KeyRound size={32} className="text-spice mx-auto mb-4" />
+              <h3 className="text-display text-lg text-spice mb-2">Organizer Token</h3>
+              <p className="text-sm text-sand-dark mb-6">
+                Changes on this server need the organizer token. It is stored in this browser.
+              </p>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setAdminToken(tokenInput.trim());
+                  setTokenInput("");
+                  clearApiError();
+                }}
+              >
+                <input
+                  type="password"
+                  value={tokenInput}
+                  onChange={(e) => setTokenInput(e.target.value)}
+                  placeholder="Token..."
+                  className="input-imperial w-full mb-4 text-center"
+                  autoFocus
+                />
+                <div className="flex gap-3 justify-center">
+                  <button type="submit" disabled={!tokenInput.trim()} className="btn-imperial-filled text-sm py-2 px-6 disabled:opacity-40">
+                    Save
+                  </button>
+                  <button type="button" onClick={clearApiError} className="btn-imperial text-sm py-2">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+              <p className="text-[10px] text-sand-dark mt-4 uppercase tracking-widest">Then repeat the last action</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Share Modal */}
       <ShareModal
