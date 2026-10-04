@@ -47,13 +47,13 @@ export function ModeSelectorPage({ onCreate, apiMode, onOpenTournament, busy }: 
         setListError(null);
       })
       .catch((err) => setListError(err instanceof Error ? err.message : String(err)));
-    listTierPresets().then(setServerPresets).catch(() => setServerPresets([]));
+    listTierPresets().then((list) => setServerPresets(list.filter((p) => !p.builtin))).catch(() => setServerPresets([]));
   };
 
   useEffect(() => {
     if (!apiMode) return;
     listTournaments().then(setTournaments).catch((err) => setListError(err instanceof Error ? err.message : String(err)));
-    listTierPresets().then(setServerPresets).catch(() => setServerPresets([]));
+    listTierPresets().then((list) => setServerPresets(list.filter((p) => !p.builtin))).catch(() => setServerPresets([]));
   }, [apiMode]);
 
   const template = FORMAT_TEMPLATES.find((t) => t.id === selected);

@@ -529,7 +529,9 @@ export function DashboardPage({
           {currentRound && (
             <div>
               <h2 className="text-display text-sm text-sand-dark mb-4 text-center">
-                Round {currentRound.number} &mdash; {getRoundStageName(state, currentRound)}
+                {isCustom
+                  ? getRoundStageName(state, currentRound)
+                  : <>Round {currentRound.number} &mdash; {getRoundStageName(state, currentRound)}</>}
                 {currentRound.leaderTier && !isColosseum && (
                   <span
                     className="ml-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-widest rounded-sm border align-middle"

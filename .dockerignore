@@ -1,0 +1,11 @@
+.git
+.github
+**/node_modules
+dist
+e2e
+test-results
+*.png
+.env
+.env.*
+!.env.example
+server/test

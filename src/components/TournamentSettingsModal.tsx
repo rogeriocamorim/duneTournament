@@ -50,7 +50,7 @@ const PAIRING_LABELS: Record<PairingMethod, string> = {
 };
 
 const STAGE_KIND_LABELS: Record<StageConfig["kind"], string> = {
-  "rounds": "Rounds",
+  "rounds": "Round-based stage",
   "classic-bracket": "Top 16 double-chance bracket",
   "colosseum-bracket": "Colosseum knockout bracket",
 };
@@ -87,7 +87,7 @@ function SettingsDialog({ state, onClose, onSave }: SettingsDialogProps) {
 
   useEffect(() => {
     if (!isApiMode()) return;
-    listTierPresets().then(setServerPresets).catch(() => setServerPresets([]));
+    listTierPresets().then((list) => setServerPresets(list.filter((p) => !p.builtin))).catch(() => setServerPresets([]));
   }, []);
 
   const isCustom = state.mode === "custom";
@@ -285,7 +285,7 @@ function SettingsDialog({ state, onClose, onSave }: SettingsDialogProps) {
                           <input
                             value={stage.name}
                             onChange={(e) => updateStage(i, { name: e.target.value })}
-                            className="input-imperial text-sm py-1 flex-1 min-w-[10rem]"
+                            className="field-imperial text-sm py-1 flex-1 min-w-[10rem]"
                             aria-label="Stage name"
                           />
                           <span className="text-[10px] uppercase tracking-widest text-sand-dark">
@@ -314,7 +314,7 @@ function SettingsDialog({ state, onClose, onSave }: SettingsDialogProps) {
                                 const rounds = Math.max(Math.max(1, generated), Math.min(20, Math.round(num(e.target.value, stage.rounds))));
                                 updateStage(i, { rounds });
                               }}
-                              className="input-imperial text-sm py-1 disabled:opacity-50"
+                              className="field-imperial text-sm py-1 disabled:opacity-50"
                             />
                           </label>
 
@@ -325,7 +325,7 @@ function SettingsDialog({ state, onClose, onSave }: SettingsDialogProps) {
                               value={stage.pairing}
                               disabled={!isCustom || locked}
                               onChange={(e) => updateStage(i, { pairing: e.target.value as PairingMethod })}
-                              className="input-imperial text-sm py-1 disabled:opacity-50"
+                              className="field-imperial text-sm py-1 disabled:opacity-50"
                             >
                               {(Object.keys(PAIRING_LABELS) as PairingMethod[]).map((p) => (
                                 <option key={p} value={p}>{PAIRING_LABELS[p]}</option>
@@ -337,7 +337,7 @@ function SettingsDialog({ state, onClose, onSave }: SettingsDialogProps) {
                           <label className="flex flex-col gap-1">
                             <span className="uppercase tracking-widest text-sand-dark">Who plays this stage</span>
                             {i === 0 ? (
-                              <span className="input-imperial text-sm py-1 opacity-60">All registered players</span>
+                              <span className="field-imperial text-sm py-1 opacity-60">All registered players</span>
                             ) : (
                               <div className="flex gap-2">
                                 <select
@@ -349,7 +349,7 @@ function SettingsDialog({ state, onClose, onSave }: SettingsDialogProps) {
                                       advancement: kind === "top-n" ? { kind, n: 8 } : kind === "table-winners" ? { kind, perTable: 1 } : { kind },
                                     });
                                   }}
-                                  className="input-imperial text-sm py-1 flex-1 disabled:opacity-50"
+                                  className="field-imperial text-sm py-1 flex-1 disabled:opacity-50"
                                 >
                                   <option value="all">Everyone from the previous stage</option>
                                   <option value="top-n">Top N of the previous stage</option>
@@ -363,7 +363,7 @@ function SettingsDialog({ state, onClose, onSave }: SettingsDialogProps) {
                                     value={stage.advancement.n ?? 8}
                                     disabled={!isCustom || locked}
                                     onChange={(e) => updateStage(i, { advancement: { kind: "top-n", n: Math.max(1, Math.round(num(e.target.value, 8))) } })}
-                                    className="input-imperial text-sm py-1 w-20 disabled:opacity-50"
+                                    className="field-imperial text-sm py-1 w-20 disabled:opacity-50"
                                     aria-label="Number of players advancing"
                                   />
                                 )}
@@ -372,7 +372,7 @@ function SettingsDialog({ state, onClose, onSave }: SettingsDialogProps) {
                                     value={stage.advancement.perTable ?? 1}
                                     disabled={!isCustom || locked}
                                     onChange={(e) => updateStage(i, { advancement: { kind: "table-winners", perTable: Number(e.target.value) } })}
-                                    className="input-imperial text-sm py-1 w-24 disabled:opacity-50"
+                                    className="field-imperial text-sm py-1 w-24 disabled:opacity-50"
                                     aria-label="Players advancing per table"
                                   >
                                     {[1, 2, 3].map((n) => <option key={n} value={n}>Top {n}</option>)}
@@ -416,7 +416,7 @@ function SettingsDialog({ state, onClose, onSave }: SettingsDialogProps) {
                                         pts[pi] = num(e.target.value, p);
                                         updateStage(i, { placementPoints: pts });
                                       }}
-                                      className="input-imperial text-sm py-1 w-16"
+                                      className="field-imperial text-sm py-1 w-16"
                                     />
                                   </label>
                                 ))}
@@ -446,7 +446,7 @@ function SettingsDialog({ state, onClose, onSave }: SettingsDialogProps) {
                                     onChange={(e) => updateStage(i, {
                                       clockBudgetMinutes: e.target.value === "" ? null : Math.max(1, num(e.target.value, format.clock.budgetMinutes)),
                                     })}
-                                    className="input-imperial text-sm py-1 w-20"
+                                    className="field-imperial text-sm py-1 w-20"
                                   />
                                 </label>
                               )}
@@ -499,7 +499,7 @@ function SettingsDialog({ state, onClose, onSave }: SettingsDialogProps) {
                               pts[pi] = num(e.target.value, p);
                               setFormat((f) => ({ ...f, placementPoints: pts }));
                             }}
-                            className="input-imperial text-center text-sm py-1 w-20"
+                            className="field-imperial text-center text-sm py-1 w-20"
                           />
                         </label>
                       ))}
@@ -530,25 +530,25 @@ function SettingsDialog({ state, onClose, onSave }: SettingsDialogProps) {
                             <span className="uppercase tracking-widest text-sand-dark">Minutes per player</span>
                             <input type="number" min={1} value={format.clock.budgetMinutes}
                               onChange={(e) => setClock({ budgetMinutes: Math.max(1, num(e.target.value, format.clock.budgetMinutes)) })}
-                              className="input-imperial text-sm py-1" />
+                              className="field-imperial text-sm py-1" />
                           </label>
                           <label className="flex flex-col gap-1">
                             <span className="uppercase tracking-widest text-sand-dark">Points lost / minute over</span>
                             <input type="number" min={0} step="0.5" value={format.clock.penaltyPerMinute}
                               onChange={(e) => setClock({ penaltyPerMinute: Math.max(0, num(e.target.value, format.clock.penaltyPerMinute)) })}
-                              className="input-imperial text-sm py-1" />
+                              className="field-imperial text-sm py-1" />
                           </label>
                           <label className="flex flex-col gap-1">
                             <span className="uppercase tracking-widest text-sand-dark">Max penalty / game</span>
                             <input type="number" min={0} placeholder="No cap" value={format.clock.penaltyCap ?? ""}
                               onChange={(e) => setClock({ penaltyCap: e.target.value === "" ? null : Math.max(0, num(e.target.value, 0)) })}
-                              className="input-imperial text-sm py-1" />
+                              className="field-imperial text-sm py-1" />
                           </label>
                           <label className="flex flex-col gap-1">
                             <span className="uppercase tracking-widest text-sand-dark">Partial minutes</span>
                             <select value={format.clock.rounding}
                               onChange={(e) => setClock({ rounding: e.target.value as ClockConfig["rounding"] })}
-                              className="input-imperial text-sm py-1">
+                              className="field-imperial text-sm py-1">
                               <option value="started-minute">Count as a full minute</option>
                               <option value="full-minute">Ignore</option>
                             </select>
@@ -594,13 +594,13 @@ function SettingsDialog({ state, onClose, onSave }: SettingsDialogProps) {
                         <input
                           value={tier.code}
                           onChange={(e) => renameTierCode(ti, e.target.value.replace(/\s|\+|\//g, "").slice(0, 4))}
-                          className="input-imperial text-sm py-1 w-16 text-center font-bold"
+                          className="field-imperial text-sm py-1 w-16 text-center font-bold"
                           aria-label="Tier code"
                         />
                         <input
                           value={tier.label}
                           onChange={(e) => updateTier(ti, { label: e.target.value })}
-                          className="input-imperial text-sm py-1 flex-1 min-w-[8rem]"
+                          className="field-imperial text-sm py-1 flex-1 min-w-[8rem]"
                           aria-label="Tier label"
                         />
                         <input
@@ -682,7 +682,7 @@ function SettingsDialog({ state, onClose, onSave }: SettingsDialogProps) {
                               <select
                                 value={rule.roundInStage ?? ""}
                                 onChange={(e) => updateRule(si, ri, { roundInStage: e.target.value === "" ? undefined : Number(e.target.value) })}
-                                className="input-imperial text-xs py-1"
+                                className="field-imperial text-xs py-1"
                                 aria-label="Round"
                               >
                                 <option value="">All rounds</option>
@@ -725,7 +725,7 @@ function SettingsDialog({ state, onClose, onSave }: SettingsDialogProps) {
                                   selection: e.target.value as TierRule["selection"],
                                   poolSize: e.target.value === "random-n" ? rule.poolSize ?? 5 : undefined,
                                 })}
-                                className="input-imperial text-xs py-1"
+                                className="field-imperial text-xs py-1"
                                 aria-label="Pool"
                               >
                                 <option value="all">All leaders of the tier(s)</option>
@@ -737,7 +737,7 @@ function SettingsDialog({ state, onClose, onSave }: SettingsDialogProps) {
                                   min={1}
                                   value={rule.poolSize ?? 5}
                                   onChange={(e) => updateRule(si, ri, { poolSize: Math.max(1, Math.round(num(e.target.value, 5))) })}
-                                  className="input-imperial text-xs py-1 w-14"
+                                  className="field-imperial text-xs py-1 w-14"
                                   aria-label="Pool size"
                                 />
                               )}

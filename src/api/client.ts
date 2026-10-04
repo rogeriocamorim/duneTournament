@@ -86,6 +86,8 @@ export interface ServerTierPreset {
   id: string;
   name: string;
   description: string;
+  /** Built-in presets come from the engine (TIER_PRESETS) */
+  builtin?: boolean;
   tiers: TierDef[];
 }
 

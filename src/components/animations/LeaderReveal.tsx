@@ -101,6 +101,7 @@ export function LeaderReveal({ leaders, tier, color, onComplete, skipToGrid: ski
           onComplete();
         }}
         className="absolute top-6 right-6 z-10 text-sand-dark hover:text-sand transition-colors"
+        aria-label="Close leader reveal"
       >
         <X size={24} />
       </button>
@@ -131,7 +132,7 @@ export function LeaderReveal({ leaders, tier, color, onComplete, skipToGrid: ski
               {config.label}
             </h1>
             <p className="text-sm text-sand-dark uppercase tracking-widest mb-8">
-              7 leaders will be revealed
+              {leaders.length} leaders will be revealed
             </p>
             <motion.div
               animate={{ y: [0, 8, 0] }}

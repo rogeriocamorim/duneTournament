@@ -417,7 +417,7 @@ export function TableCard({
                   const earned = placementPoints[result.position - 1] ?? 0;
                   return (
                     <span className="text-score text-spice text-sm w-16 text-right" title={penalty ? `${earned} points − ${penalty} clock penalty` : undefined}>
-                      +{earned - penalty}
+                      {earned - penalty >= 0 ? "+" : "\u2212"}{Math.abs(earned - penalty)}
                       {penalty > 0 && <span className="text-blood text-[10px] ml-0.5">(−{penalty})</span>}
                     </span>
                   );

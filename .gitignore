@@ -25,3 +25,11 @@ dist-ssr
 
 # Cache
 node-compile-cache/
+
+# Environment files (secrets) — see .env.example
+.env
+.env.*
+!.env.example
+
+# Database backups from deploy/deploy.sh
+backups/

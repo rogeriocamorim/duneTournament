@@ -1,7 +1,8 @@
 # AGENTS.md — Dune Tournament Manager
 
-Client-side React 19 app for managing Dune: Imperium tournament brackets.
-No backend — all state in localStorage. Deployed to GitHub Pages at `/duneTournament/`.
+React 19 app for managing Dune: Imperium tournaments, plus an optional Node API with Postgres.
+- Browser mode (no `VITE_API_URL`): state in localStorage, deployed to GitHub Pages at `/duneTournament/`.
+- Server mode (Docker): the API in `server/` runs the shared engine reducer and stores tournaments in Postgres.
 
 **Stack**: TypeScript 5.9, Vite 7, Tailwind CSS v4 (`@tailwindcss/vite`), Motion v12 (`motion/react`),
 `lucide-react`, ESM (`"type": "module"`).
@@ -21,9 +22,22 @@ npm test             # Run Vitest tests once (vitest run)
 npm run test:watch   # Run Vitest in watch mode
 ```
 
+```bash
+cd server
+npm run dev          # API with reload (needs DATABASE_URL)
+npm run typecheck
+TEST_DATABASE_URL=postgres://... npm test   # API tests (wipes that database)
+```
+
+```bash
+docker compose -p dune-tournament-dev --env-file .env up -d --build   # full stack
+./deploy/deploy.sh dev                                                # deploy to the Orange Pi
+```
+
 **Test framework**: Vitest 4. Tests live alongside source files (`*.test.ts`).
-Main test file: `src/engine/tournament.test.ts` (40 tests covering bracket generation,
-redemption round, Grand Final, and final standings tiers).
+Engine tests: `src/engine/tournament.test.ts` (pairing, bracket, standings) and
+`src/engine/format.test.ts` (formats, stages, tier rules, placement points, clock penalties).
+Server tests: `server/test/api.test.ts` (real Postgres).
 
 ## Project Structure
 
@@ -36,8 +50,13 @@ dune-tournament/
     engine/
       types.ts                      # All shared interfaces, constants, leader data
       tournament.ts                 # Pure logic: pairing, scoring, standings
+      format.ts                     # Formats/templates, stages, tier presets + rules, clock
+      reducer.ts                    # Tournament state machine (browser + server)
+      snapshot.ts                   # Spectator snapshot builder
+    api/
+      client.ts                     # API client (server mode)
     hooks/
-      useTournamentState.ts         # useReducer + localStorage persistence
+      useTournamentState.ts         # Local reducer or server actions + persistence
     pages/
       RegistrationPage.tsx          # Player registration phase
       DashboardPage.tsx             # Qualifying rounds (Swiss pairing)
@@ -47,11 +66,19 @@ dune-tournament/
       Leaderboard.tsx               # Standings table
       GuildNavigator.tsx            # Import/Export modal
       LeaderStatsPanel.tsx          # Leader (character) statistics
+      TournamentSettingsModal.tsx   # Format, points, clock, tiers, stage tiers
+      ManualPairingModal.tsx        # Organizer seats tables (manual pairing)
       animations/
         SandstormTransition.tsx     # Full-screen wipe transition
         SpiceExplosion.tsx          # Particle burst animation
         SandwormRegistration.tsx    # Player name input form
-  vite.config.ts                    # base: "/duneTournament/"
+  server/
+    src/app.ts                      # Fastify routes (/api/...)
+    src/repository.ts               # TournamentState <-> normalized tables
+    migrations/*.sql                # Schema, applied on startup
+  deploy/deploy.sh                  # SSH + docker compose deploy (dev/prod)
+  docker-compose.yml                # web (nginx) + api + db (Postgres)
+  vite.config.ts                    # base: VITE_BASE or "/duneTournament/"
   eslint.config.js                  # ESLint 9 flat config
   tsconfig.json                     # Project references root
   tsconfig.app.json                 # App: ES2022, strict, verbatimModuleSyntax
@@ -119,7 +146,8 @@ import { getLeaderInfo } from "./types";
 
 ### State Management
 
-- Single `useReducer` in `useTournamentState` — no Context, no external libs
+- One reducer (`engine/reducer.ts`) used by `useTournamentState` and by the API — no Context, no external libs
+- New tournament behavior goes into the reducer/engine so both modes stay identical
 - Props drilled from `App` → pages → components
 - `structuredClone()` for deep copies in engine (not spread for nested mutations)
 - localStorage key: `dune_tournament_state`
@@ -144,12 +172,15 @@ Section headers: `// ===== SECTION NAME =====`. JSDoc `/** */` on exported engin
 
 ### Engine Architecture
 
-`engine/` is **pure TypeScript** — zero React imports. Functions take state in, return new state.
-The reducer in `useTournamentState.ts` bridges engine and React.
+`engine/` is **pure TypeScript** — zero React imports, zero browser APIs at module load (the
+server imports it). Functions take state in, return new state.
+Tournament rules (points, tiers, clock, stages) come from `state.format` and `state.tiers`;
+never hard-code tiers or points in components — use the helpers in `format.ts`.
 
 ### Deployment
 
-GitHub Actions deploys on push to `main` (Node 20). Vite `base: "/duneTournament/"`.
+GitHub Actions deploys browser mode to GitHub Pages on push to `main`.
+`dev` is tested on the Orange Pi (192.168.2.22) with `./deploy/deploy.sh dev`; CI runs on `dev` and PRs.
 
 # context-mode — MANDATORY routing rules
 

@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [ dev ]
+  pull_request:
+    branches: [ main, dev ]
+  workflow_dispatch:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Unit tests
+        run: npm test
+      - name: Type-check and build
+        run: npm run build
+      - name: Lint
+        # Older animation components still have React Compiler lint errors
+        continue-on-error: true
+        run: npm run lint
+
+  server:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: dune
+          POSTGRES_PASSWORD: dune
+          POSTGRES_DB: dune_tournament_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dune"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - name: Type-check
+        run: npm run typecheck
+      - name: API tests
+        run: npm test
+        env:
+          TEST_DATABASE_URL: postgres://dune:dune@localhost:5432/dune_tournament_test
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build images
+        run: docker compose build
+        env:
+          POSTGRES_PASSWORD: ci
