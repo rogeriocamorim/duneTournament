@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Deploy the Dune Tournament Docker stack (web + api + Postgres) over SSH.
 #
-#   ./deploy/deploy.sh dev            # Orange Pi test server (default 192.168.2.22)
+#   ./deploy/deploy.sh dev            # Orange Pi test server (default 192.168.2.13)
 #   ./deploy/deploy.sh prod           # production server (set PROD_HOST)
 #   ./deploy/deploy.sh dev status|logs [service]|stop|backup|token
 #
 # Settings (environment variables):
 #   SSH_USER   default root
 #   SSH_KEY    default ~/.ssh/id_rsa_dunerank
-#   DEV_HOST   default 192.168.2.22      DEV_PORT   default 8090
+#   DEV_HOST   default 192.168.2.13      DEV_PORT   default 8090
 #   PROD_HOST  required for prod        PROD_PORT  default 8080
 #
 # The first deploy creates <remote dir>/.env with a random database password
@@ -23,7 +23,7 @@ SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_rsa_dunerank}"
 
 case "$ENVIRONMENT" in
   dev)
-    HOST="${DEV_HOST:-192.168.2.22}"
+    HOST="${DEV_HOST:-192.168.2.13}"
     PORT="${DEV_PORT:-8090}"
     REMOTE_DIR="/opt/dune-tournament-dev"
     PROJECT="dune-tournament-dev"

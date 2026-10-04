@@ -180,7 +180,7 @@ never hard-code tiers or points in components — use the helpers in `format.ts`
 ### Deployment
 
 GitHub Actions deploys browser mode to GitHub Pages on push to `main`.
-`dev` is tested on the Orange Pi (192.168.2.22) with `./deploy/deploy.sh dev`; CI runs on `dev` and PRs.
+`dev` is tested on the Orange Pi (192.168.2.13) with `./deploy/deploy.sh dev`; CI runs on `dev` and PRs.
 
 # context-mode — MANDATORY routing rules
 

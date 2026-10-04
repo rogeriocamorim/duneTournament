@@ -94,7 +94,7 @@ cd server && TEST_DATABASE_URL=postgres://dune:dune@localhost:5432/dune_tourname
 
 | Branch | Where | How |
 |--------|-------|-----|
-| `dev`  | Orange Pi test server, `192.168.2.22:8090` | `./deploy/deploy.sh dev` |
+| `dev`  | Orange Pi test server, `192.168.2.13:8090` | `./deploy/deploy.sh dev` |
 | `main` | GitHub Pages (browser mode) | GitHub Actions on push |
 | `main` | Production server (Docker) | `PROD_HOST=<server> ./deploy/deploy.sh prod` |
 
